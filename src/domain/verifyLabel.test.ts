@@ -79,4 +79,39 @@ describe('verifyLabel', () => {
     expect(outcome.checks.find((check) => check.id === 'warningFormat')?.highlight?.boxes).toHaveLength(4)
     expect(outcome.checks.find((check) => check.id === 'brand')?.highlight).toBeUndefined()
   })
+
+  it('attaches coordinates to each detected application value', () => {
+    const wordLines = [
+      ['OLD', 'TOM', 'DISTILLERY'],
+      ['KENTUCKY', 'STRAIGHT', 'BOURBON', 'WHISKEY'],
+      ['45%', 'Alc./Vol.', '(90', 'Proof)'],
+      ['750', 'mL'],
+    ]
+    const ocrWords: OcrWord[] = wordLines.flatMap((line, lineIndex) =>
+      line.map((text, wordIndex) => ({
+        text,
+        confidence: 95,
+        bbox: {
+          x0: 20 + wordIndex * 50,
+          y0: 20 + lineIndex * 30,
+          x1: 60 + wordIndex * 50,
+          y1: 40 + lineIndex * 30,
+        },
+      })),
+    )
+    const outcome = verifyLabel({
+      application: INITIAL_APPLICATION,
+      ocrText: validOcrText,
+      ocrConfidence: 95,
+      durationMs: 1_250,
+      ocrWords,
+      imageWidth: 400,
+      imageHeight: 500,
+    })
+
+    expect(outcome.checks.find((check) => check.id === 'brand')?.highlight?.boxes).toHaveLength(3)
+    expect(outcome.checks.find((check) => check.id === 'classType')?.highlight?.boxes).toHaveLength(4)
+    expect(outcome.checks.find((check) => check.id === 'alcohol')?.highlight?.boxes).toHaveLength(4)
+    expect(outcome.checks.find((check) => check.id === 'netContents')?.highlight?.boxes).toHaveLength(2)
+  })
 })

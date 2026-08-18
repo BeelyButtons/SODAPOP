@@ -61,6 +61,49 @@ export function findGovernmentWarningRegion(
   return boxes.length ? { boxes, imageWidth, imageHeight } : undefined
 }
 
+export function findTextRegion(
+  words: OcrWord[],
+  phrase: string,
+  imageWidth: number,
+  imageHeight: number,
+): HighlightRegion | undefined {
+  const target = normalizeWords(phrase)
+  if (!target || !imageWidth || !imageHeight || !words.length) return undefined
+
+  const meaningfulWords = words.filter((word) => normalizeWords(word.text))
+  if (!meaningfulWords.length) return undefined
+
+  const targetWordCount = target.split(' ').length
+  const minimumWindow = Math.max(1, targetWordCount - 2)
+  const maximumWindow = targetWordCount + 2
+  let bestScore = 0
+  let bestWords: OcrWord[] = []
+
+  for (let start = 0; start < meaningfulWords.length; start += 1) {
+    for (
+      let length = minimumWindow;
+      length <= maximumWindow && start + length <= meaningfulWords.length;
+      length += 1
+    ) {
+      const candidateWords = meaningfulWords.slice(start, start + length)
+      const candidate = candidateWords.map((word) => word.text).join(' ')
+      const score = similarity(target, candidate)
+      if (score > bestScore) {
+        bestScore = score
+        bestWords = candidateWords
+      }
+    }
+  }
+
+  if (bestScore < 0.68) return undefined
+  const boxes = bestWords
+    .filter((word) => word.confidence >= 20)
+    .map((word) => word.bbox)
+    .filter((box) => box.x1 > box.x0 && box.y1 > box.y0)
+
+  return boxes.length ? { boxes, imageWidth, imageHeight } : undefined
+}
+
 function textMatchCheck(
   id: 'brand' | 'classType',
   label: string,
@@ -201,16 +244,35 @@ function warningChecks(
 }
 
 export function verifyLabel(input: VerificationInput): ReviewOutcome {
+  const words = input.ocrWords ?? []
+  const imageWidth = input.imageWidth ?? 0
+  const imageHeight = input.imageHeight ?? 0
   const warningHighlight = findGovernmentWarningRegion(
-    input.ocrWords ?? [],
-    input.imageWidth ?? 0,
-    input.imageHeight ?? 0,
+    words,
+    imageWidth,
+    imageHeight,
   )
+  const brandCheck = textMatchCheck('brand', 'Brand name', input.application.brandName, input.ocrText)
+  const classTypeCheck = textMatchCheck(
+    'classType',
+    'Class / type',
+    input.application.classType,
+    input.ocrText,
+  )
+  const detectedAlcoholCheck = alcoholCheck(input.application.alcoholContent, input.ocrText)
+  const netContentsCheck = volumeCheck(input.application.netContents, input.ocrText)
+
+  const withDetectedHighlight = (check: ReviewCheck): ReviewCheck => {
+    if (/not found|not confidently found/i.test(check.observed)) return check
+    const highlight = findTextRegion(words, check.observed, imageWidth, imageHeight)
+    return highlight ? { ...check, highlight } : check
+  }
+
   const checks: ReviewCheck[] = [
-    textMatchCheck('brand', 'Brand name', input.application.brandName, input.ocrText),
-    textMatchCheck('classType', 'Class / type', input.application.classType, input.ocrText),
-    alcoholCheck(input.application.alcoholContent, input.ocrText),
-    volumeCheck(input.application.netContents, input.ocrText),
+    withDetectedHighlight(brandCheck),
+    withDetectedHighlight(classTypeCheck),
+    withDetectedHighlight(detectedAlcoholCheck),
+    withDetectedHighlight(netContentsCheck),
     ...warningChecks(
       input.ocrText,
       input.ocrConfidence,
