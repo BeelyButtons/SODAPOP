@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { GOVERNMENT_WARNING, INITIAL_APPLICATION } from './reviewSchema'
+import { GOVERNMENT_WARNING, INITIAL_APPLICATION, type OcrWord } from './reviewSchema'
 import { verifyLabel } from './verifyLabel'
 
 const validOcrText = `
@@ -55,5 +55,28 @@ describe('verifyLabel', () => {
     const outcome = review('OLD TOM DISTILLERY\n45% Alc./Vol. (90 Proof)\n750 mL', 52)
 
     expect(outcome.checks.find((check) => check.id === 'warningText')?.status).toBe('needs_review')
+  })
+
+  it('attaches OCR coordinates to both government warning checks', () => {
+    const ocrWords: OcrWord[] = ['GOVERNMENT', 'WARNING:', 'health', 'problems.'].map(
+      (text, index) => ({
+        text,
+        confidence: 96,
+        bbox: { x0: index * 20, y0: 80, x1: index * 20 + 16, y1: 96 },
+      }),
+    )
+    const outcome = verifyLabel({
+      application: INITIAL_APPLICATION,
+      ocrText: validOcrText,
+      ocrConfidence: 95,
+      durationMs: 1_250,
+      ocrWords,
+      imageWidth: 200,
+      imageHeight: 300,
+    })
+
+    expect(outcome.checks.find((check) => check.id === 'warningText')?.highlight?.boxes).toHaveLength(4)
+    expect(outcome.checks.find((check) => check.id === 'warningFormat')?.highlight?.boxes).toHaveLength(4)
+    expect(outcome.checks.find((check) => check.id === 'brand')?.highlight).toBeUndefined()
   })
 })

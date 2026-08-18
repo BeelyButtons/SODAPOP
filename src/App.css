@@ -58,11 +58,8 @@ footer {
 }
 
 .hero-section {
-  display: grid;
-  grid-template-columns: minmax(0, 1.65fr) minmax(280px, 0.7fr);
-  gap: 80px;
-  align-items: end;
-  padding: 76px 0 54px;
+  max-width: 780px;
+  padding: 54px 0 38px;
 }
 
 .eyebrow {
@@ -78,18 +75,18 @@ footer {
   margin: 0;
   color: var(--forest);
   font-family: Georgia, "Times New Roman", serif;
-  font-size: clamp(46px, 6.2vw, 75px);
-  font-weight: 500;
-  line-height: 0.99;
-  letter-spacing: -0.055em;
+  font-size: clamp(48px, 6vw, 70px);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.045em;
 }
 
-.hero-copy {
-  max-width: 710px;
-  margin: 28px 0 0;
+.product-name {
+  max-width: 720px;
+  margin: 14px 0 0;
   color: #59655c;
-  font-size: 18px;
-  line-height: 1.65;
+  font-size: clamp(15px, 2vw, 18px);
+  line-height: 1.5;
 }
 
 .privacy-card {
@@ -114,10 +111,10 @@ footer {
   font-weight: 800;
 }
 
-.privacy-card strong {
-  display: block;
-  margin-bottom: 4px;
+.privacy-card h2 {
+  margin: 0 0 4px;
   color: var(--forest);
+  font-family: Georgia, "Times New Roman", serif;
   font-size: 15px;
 }
 
@@ -342,7 +339,7 @@ footer {
 }
 
 .image-preview {
-  height: 242px;
+  height: 540px;
   position: relative;
   overflow: hidden;
   border: 1px solid var(--line);
@@ -356,34 +353,27 @@ footer {
   object-fit: contain;
 }
 
-.image-preview > div {
-  position: absolute;
-  right: 10px;
-  bottom: 10px;
-  left: 10px;
+.image-file-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 9px 11px;
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  border-radius: 8px;
-  color: #fff;
-  background: rgba(20, 44, 29, 0.88);
+  padding: 10px 2px 0;
+  color: #4d5950;
   font-size: 12px;
-  backdrop-filter: blur(8px);
 }
 
-.image-preview span {
+.image-file-row span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.image-preview button {
-  padding: 4px 8px;
-  border: 0;
-  border-radius: 5px;
+.image-file-row button {
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  border: 1px solid #bfc9c0;
+  border-radius: 6px;
   color: var(--forest);
   background: #fff;
   font-size: 11px;
@@ -585,6 +575,103 @@ footer {
   margin-top: 32px;
 }
 
+.results-comparison {
+  display: grid;
+  grid-template-columns: minmax(340px, 0.9fr) minmax(0, 1.25fr);
+  gap: 18px;
+  align-items: start;
+  margin-top: 18px;
+}
+
+.results-preview {
+  min-width: 0;
+  position: sticky;
+  top: 18px;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 18px 45px rgba(25, 47, 32, 0.06);
+}
+
+.results-preview-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.results-preview-heading span,
+.results-preview-heading strong {
+  display: block;
+}
+
+.results-preview-heading > div > span {
+  color: #758078;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.results-preview-heading strong {
+  margin-top: 3px;
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.highlight-key {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 6px;
+  color: #6d5018;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.highlight-key i {
+  width: 12px;
+  height: 12px;
+  border: 1px solid #bd801b;
+  border-radius: 2px;
+  background: rgba(244, 180, 54, 0.35);
+}
+
+.results-preview-frame {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #cfd7cf;
+  border-radius: 10px;
+  background: #edf0ec;
+}
+
+.results-preview-frame img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.ocr-highlight-box {
+  position: absolute;
+  z-index: 1;
+  border: 1px solid rgba(170, 103, 0, 0.95);
+  border-radius: 2px;
+  background: rgba(255, 190, 55, 0.38);
+  box-shadow: 0 0 0 1px rgba(255, 247, 215, 0.45);
+  pointer-events: none;
+}
+
+.results-preview figcaption {
+  overflow: hidden;
+  margin-top: 9px;
+  color: var(--muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .result-summary {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -678,9 +765,8 @@ footer {
 
 .check-list {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 14px;
-  margin-top: 14px;
 }
 
 .check-card {
@@ -689,6 +775,27 @@ footer {
   border: 1px solid var(--line);
   border-radius: 12px;
   background: #fff;
+  transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+}
+
+.check-card-highlightable {
+  cursor: pointer;
+}
+
+.check-card-highlightable:hover,
+.check-card-highlightable:focus-visible,
+.check-card-active {
+  border-color: #b37a1f;
+  box-shadow: 0 0 0 3px rgba(179, 122, 31, 0.12);
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.highlight-hint {
+  margin: 8px 0 -5px 36px;
+  color: #8a631d;
+  font-size: 10px;
+  font-weight: 700;
 }
 
 .check-header,
@@ -814,14 +921,25 @@ footer {
   white-space: pre-wrap;
 }
 
+.trust-notes {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.75fr);
+  gap: 14px;
+  margin: 36px 0 70px;
+}
+
 .boundary-note {
   display: flex;
   gap: 16px;
   align-items: flex-start;
-  margin: 36px 0 70px;
   padding: 23px 26px;
-  border-top: 1px solid #d6ddd5;
-  border-bottom: 1px solid #d6ddd5;
+  border: 1px solid #d6ddd5;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.trust-notes .privacy-card {
+  align-items: flex-start;
 }
 
 .boundary-note > span {
@@ -860,19 +978,14 @@ footer {
 }
 
 @media (max-width: 900px) {
-  .hero-section {
-    grid-template-columns: 1fr;
-    gap: 30px;
-    padding-top: 56px;
-  }
-
-  .privacy-card {
-    max-width: 560px;
-  }
-
   .review-grid,
-  .check-list {
+  .results-comparison,
+  .trust-notes {
     grid-template-columns: 1fr;
+  }
+
+  .results-preview {
+    position: static;
   }
 
   .upload-panel {
@@ -914,8 +1027,12 @@ footer {
     font-size: 42px;
   }
 
-  .hero-copy {
+  .product-name {
     font-size: 16px;
+  }
+
+  .image-preview {
+    height: 420px;
   }
 
   .workspace-heading,

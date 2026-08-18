@@ -1,4 +1,5 @@
 import { createWorker, OEM, PSM, type LoggerMessage } from 'tesseract.js'
+import type { OcrBox, OcrWord } from '../domain/reviewSchema'
 
 export type OcrProgress = {
   progress: number
@@ -62,16 +63,51 @@ async function getWorker() {
   return workerPromise
 }
 
+type TesseractWord = {
+  text: string
+  confidence: number
+  bbox: OcrBox
+}
+
+type TesseractBlock = {
+  paragraphs?: Array<{
+    lines?: Array<{
+      words?: TesseractWord[]
+    }>
+  }>
+}
+
+function flattenWords(blocks: unknown): OcrWord[] {
+  if (!Array.isArray(blocks)) return []
+
+  return (blocks as TesseractBlock[]).flatMap((block) =>
+    (block.paragraphs ?? []).flatMap((paragraph) =>
+      (paragraph.lines ?? []).flatMap((line) =>
+        (line.words ?? []).map((word) => ({
+          text: word.text,
+          confidence: word.confidence,
+          bbox: word.bbox,
+        })),
+      ),
+    ),
+  )
+}
+
 async function preprocessImage(file: File) {
   try {
     const bitmap = await createImageBitmap(file)
+    const sourceWidth = bitmap.width
+    const sourceHeight = bitmap.height
     const longestSide = Math.max(bitmap.width, bitmap.height)
     const scale = Math.min(1, 2200 / longestSide)
     const canvas = document.createElement('canvas')
     canvas.width = Math.round(bitmap.width * scale)
     canvas.height = Math.round(bitmap.height * scale)
     const context = canvas.getContext('2d', { willReadFrequently: true })
-    if (!context) return file
+    if (!context) {
+      bitmap.close()
+      return { image: file, width: sourceWidth, height: sourceHeight }
+    }
 
     context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
     bitmap.close()
@@ -87,9 +123,9 @@ async function preprocessImage(file: File) {
       image.data[index + 2] = contrasted
     }
     context.putImageData(image, 0, 0)
-    return canvas
+    return { image: canvas, width: canvas.width, height: canvas.height }
   } catch {
-    return file
+    return { image: file, width: 0, height: 0 }
   }
 }
 
@@ -107,9 +143,9 @@ export async function recognizeLabel(
       20_000,
       'The local OCR engine took too long to initialize. Please try again.',
     )
-    const image = await preprocessImage(file)
+    const prepared = await preprocessImage(file)
     const result = await withTimeout(
-      worker.recognize(image, {}, { text: true, blocks: false }),
+      worker.recognize(prepared.image, {}, { text: true, blocks: true }),
       30_000,
       'The label review exceeded 30 seconds. Try a smaller or clearer image.',
     )
@@ -117,6 +153,9 @@ export async function recognizeLabel(
       text: result.data.text,
       confidence: result.data.confidence,
       durationMs: performance.now() - startedAt,
+      words: flattenWords(result.data.blocks),
+      imageWidth: prepared.width,
+      imageHeight: prepared.height,
     }
   } catch (error) {
     await discardWorker()

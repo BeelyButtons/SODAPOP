@@ -32,6 +32,25 @@ export const INITIAL_APPLICATION: ApplicationData = {
 
 export type CheckStatus = 'pass' | 'mismatch' | 'needs_review'
 
+export type OcrBox = {
+  x0: number
+  y0: number
+  x1: number
+  y1: number
+}
+
+export type OcrWord = {
+  text: string
+  confidence: number
+  bbox: OcrBox
+}
+
+export type HighlightRegion = {
+  boxes: OcrBox[]
+  imageWidth: number
+  imageHeight: number
+}
+
 export type ReviewCheck = {
   id: 'brand' | 'classType' | 'alcohol' | 'netContents' | 'warningText' | 'warningFormat'
   label: string
@@ -39,6 +58,7 @@ export type ReviewCheck = {
   expected: string
   observed: string
   explanation: string
+  highlight?: HighlightRegion
 }
 
 export type ReviewOutcome = {

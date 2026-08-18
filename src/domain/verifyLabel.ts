@@ -2,6 +2,8 @@ import {
   GOVERNMENT_WARNING,
   type ApplicationData,
   type CheckStatus,
+  type HighlightRegion,
+  type OcrWord,
   type ReviewCheck,
   type ReviewOutcome,
 } from './reviewSchema'
@@ -21,6 +23,42 @@ type VerificationInput = {
   ocrText: string
   ocrConfidence: number
   durationMs: number
+  ocrWords?: OcrWord[]
+  imageWidth?: number
+  imageHeight?: number
+}
+
+function normalizedToken(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, '')
+}
+
+export function findGovernmentWarningRegion(
+  words: OcrWord[],
+  imageWidth: number,
+  imageHeight: number,
+): HighlightRegion | undefined {
+  if (!imageWidth || !imageHeight) return undefined
+  const tokens = words.map((word) => normalizedToken(word.text))
+  const start = tokens.findIndex(
+    (token, index) => token === 'government' && tokens[index + 1] === 'warning',
+  )
+  if (start < 0) return undefined
+
+  let end = Math.min(words.length, start + normalizeWords(GOVERNMENT_WARNING).split(' ').length + 8)
+  for (let index = start + 2; index < Math.min(words.length - 1, end); index += 1) {
+    if (tokens[index] === 'health' && tokens[index + 1]?.startsWith('problem')) {
+      end = index + 2
+      break
+    }
+  }
+
+  const boxes = words
+    .slice(start, end)
+    .filter((word) => word.confidence >= 20)
+    .map((word) => word.bbox)
+    .filter((box) => box.x1 > box.x0 && box.y1 > box.y0)
+
+  return boxes.length ? { boxes, imageWidth, imageHeight } : undefined
 }
 
 function textMatchCheck(
@@ -101,7 +139,12 @@ function volumeCheck(expected: string, text: string): ReviewCheck {
   }
 }
 
-function warningChecks(text: string, confidence: number, containerVolumeMl: number): ReviewCheck[] {
+function warningChecks(
+  text: string,
+  confidence: number,
+  containerVolumeMl: number,
+  highlight?: HighlightRegion,
+): ReviewCheck[] {
   const collapsed = collapseWhitespace(text)
   const exactMatch = collapsed.includes(GOVERNMENT_WARNING)
   const caseInsensitiveMatch = collapsed.toLowerCase().includes(GOVERNMENT_WARNING.toLowerCase())
@@ -139,6 +182,7 @@ function warningChecks(text: string, confidence: number, containerVolumeMl: numb
       expected: GOVERNMENT_WARNING,
       observed: observed || 'Not found',
       explanation: textExplanation,
+      highlight,
     },
     {
       id: 'warningFormat',
@@ -151,17 +195,28 @@ function warningChecks(text: string, confidence: number, containerVolumeMl: numb
       explanation: uppercaseHeading
         ? 'Confirm bolding, type size, contrast, and separation visually. A photo has no reliable physical scale.'
         : 'The heading must read “GOVERNMENT WARNING” in uppercase before visual formatting review.',
+      highlight,
     },
   ]
 }
 
 export function verifyLabel(input: VerificationInput): ReviewOutcome {
+  const warningHighlight = findGovernmentWarningRegion(
+    input.ocrWords ?? [],
+    input.imageWidth ?? 0,
+    input.imageHeight ?? 0,
+  )
   const checks: ReviewCheck[] = [
     textMatchCheck('brand', 'Brand name', input.application.brandName, input.ocrText),
     textMatchCheck('classType', 'Class / type', input.application.classType, input.ocrText),
     alcoholCheck(input.application.alcoholContent, input.ocrText),
     volumeCheck(input.application.netContents, input.ocrText),
-    ...warningChecks(input.ocrText, input.ocrConfidence, input.application.containerVolumeMl),
+    ...warningChecks(
+      input.ocrText,
+      input.ocrConfidence,
+      input.application.containerVolumeMl,
+      warningHighlight,
+    ),
   ]
 
   const status: CheckStatus = checks.some((check) => check.status === 'mismatch')

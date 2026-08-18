@@ -30,10 +30,12 @@ export function UploadPanel({
       <p className="panel-description">JPEG, PNG, or WebP · 10 MB maximum</p>
 
       {file && previewUrl ? (
-        <div className="image-preview">
-          <img src={previewUrl} alt="Selected alcohol label preview" />
-          <div>
-            <span>{file.name}</span>
+        <div className="selected-image">
+          <div className="image-preview">
+            <img src={previewUrl} alt="Selected alcohol label preview" />
+          </div>
+          <div className="image-file-row">
+            <span title={file.name}>{file.name}</span>
             <button type="button" onClick={onRemove}>Remove</button>
           </div>
         </div>

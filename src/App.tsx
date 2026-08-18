@@ -108,6 +108,9 @@ function App() {
           ocrText: ocr.text,
           ocrConfidence: ocr.confidence,
           durationMs: ocr.durationMs,
+          ocrWords: ocr.words,
+          imageWidth: ocr.imageWidth,
+          imageHeight: ocr.imageHeight,
         }),
       )
     } catch (error) {
@@ -125,30 +128,20 @@ function App() {
   return (
     <div className="app-shell">
       <header className="site-header">
-        <a className="wordmark" href="#top" aria-label="LabelCheck home">
-          <span className="wordmark-mark" aria-hidden="true">LC</span>
-          <span>LabelCheck</span>
+        <a className="wordmark" href="#top" aria-label="SODAPOP home">
+          <span className="wordmark-mark" aria-hidden="true">SP</span>
+          <span>SODAPOP</span>
         </a>
         <span className="prototype-badge">Prototype · Distilled spirits</span>
       </header>
 
       <main id="top">
         <section className="hero-section" aria-labelledby="page-title">
-          <div>
-            <p className="eyebrow">AI-assisted label verification</p>
-            <h1 id="page-title">Review the label.<br />Keep the judgment.</h1>
-            <p className="hero-copy">
-              Compare application details with label artwork in seconds. Every result includes
-              evidence and clearly identifies what still needs a human decision.
-            </p>
-          </div>
-          <div className="privacy-card">
-            <span className="privacy-icon" aria-hidden="true">✓</span>
-            <div>
-              <strong>Private by design</strong>
-              <p>Images stay in this browser. No uploads, accounts, or stored review data.</p>
-            </div>
-          </div>
+          <p className="eyebrow">AI-assisted alcohol label verification</p>
+          <h1 id="page-title">SODAPOP</h1>
+          <p className="product-name">
+            System for Optical Detection, Analysis &amp; Packaging-Oversight Processing
+          </p>
         </section>
 
         <section className="workspace" aria-label="Single-label review workspace">
@@ -208,22 +201,33 @@ function App() {
           </form>
         </section>
 
-        {result && <ReviewResults result={result} />}
+        {result && previewUrl && file && (
+          <ReviewResults result={result} previewUrl={previewUrl} fileName={file.name} />
+        )}
 
-        <section className="boundary-note" aria-labelledby="boundary-title">
-          <span aria-hidden="true">i</span>
-          <div>
-            <h2 id="boundary-title">Decision-support, not automatic approval</h2>
-            <p>
-              This prototype flags discrepancies and uncertain evidence. A qualified reviewer
-              remains responsible for the final regulatory decision.
-            </p>
-          </div>
-        </section>
+        <div className="trust-notes">
+          <section className="boundary-note" aria-labelledby="boundary-title">
+            <span aria-hidden="true">i</span>
+            <div>
+              <h2 id="boundary-title">Decision-support, not automatic approval</h2>
+              <p>
+                This prototype flags discrepancies and uncertain evidence. A qualified reviewer
+                remains responsible for the final regulatory decision.
+              </p>
+            </div>
+          </section>
+          <section className="privacy-card" aria-labelledby="privacy-title">
+            <span className="privacy-icon" aria-hidden="true">✓</span>
+            <div>
+              <h2 id="privacy-title">Private by design</h2>
+              <p>Images stay in this browser. No uploads, accounts, or stored review data.</p>
+            </div>
+          </section>
+        </div>
       </main>
 
       <footer>
-        <span>LabelCheck prototype</span>
+        <span>SODAPOP prototype</span>
         <span>Local processing · No data retention</span>
       </footer>
     </div>
