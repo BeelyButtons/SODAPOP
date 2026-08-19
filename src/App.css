@@ -468,8 +468,15 @@ footer {
 
 .sample-wrong-abv,
 .sample-warning-case,
+.sample-warning-bold,
 .sample-missing-warning {
   background: #b35945;
+}
+
+.sample-angled-photo,
+.sample-glare-photo,
+.sample-dark-label {
+  background: var(--gold);
 }
 
 .form-alert {
@@ -639,6 +646,36 @@ footer {
   background: rgba(244, 180, 54, 0.35);
 }
 
+.highlight-key.highlight-pass {
+  color: #24633a;
+}
+
+.highlight-key.highlight-pass i,
+.ocr-highlight-box.highlight-pass {
+  border-color: rgba(32, 125, 67, 0.95);
+  background: rgba(68, 188, 105, 0.32);
+}
+
+.highlight-key.highlight-mismatch {
+  color: #8b302b;
+}
+
+.highlight-key.highlight-mismatch i,
+.ocr-highlight-box.highlight-mismatch {
+  border-color: rgba(180, 42, 35, 0.98);
+  background: rgba(232, 64, 55, 0.34);
+}
+
+.highlight-key.highlight-needs_review {
+  color: #795113;
+}
+
+.highlight-key.highlight-needs_review i,
+.ocr-highlight-box.highlight-needs_review {
+  border-color: rgba(179, 122, 31, 0.95);
+  background: rgba(244, 180, 54, 0.35);
+}
+
 .results-preview-frame {
   position: relative;
   overflow: hidden;
@@ -789,6 +826,16 @@ footer {
   box-shadow: 0 0 0 3px rgba(179, 122, 31, 0.12);
   outline: none;
   transform: translateY(-1px);
+}
+
+.check-card-active.check-status-pass {
+  border-color: #398553;
+  box-shadow: 0 0 0 3px rgba(57, 133, 83, 0.12);
+}
+
+.check-card-active.check-status-mismatch {
+  border-color: #b43d36;
+  box-shadow: 0 0 0 3px rgba(180, 61, 54, 0.13);
 }
 
 .highlight-hint {

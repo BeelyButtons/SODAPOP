@@ -43,6 +43,8 @@ export type OcrWord = {
   text: string
   confidence: number
   bbox: OcrBox
+  fontName?: string
+  inkRatio?: number
 }
 
 export type HighlightRegion = {

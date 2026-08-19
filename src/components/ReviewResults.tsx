@@ -34,7 +34,7 @@ function CheckCard({
 
   return (
     <article
-      className={`check-card${interactive ? ' check-card-highlightable' : ''}${active ? ' check-card-active' : ''}`}
+      className={`check-card check-status-${check.status}${interactive ? ' check-card-highlightable' : ''}${active ? ' check-card-active' : ''}`}
       tabIndex={interactive ? 0 : undefined}
       role={interactive ? 'button' : undefined}
       aria-pressed={interactive ? active : undefined}
@@ -75,6 +75,13 @@ export function ReviewResults({ result, previewUrl, fileName }: Props) {
   const activeCheckId = previewedCheck ?? selectedCheck
   const activeCheck = result.checks.find((check) => check.id === activeCheckId)
   const highlight = activeCheck?.highlight
+  const highlightStatus = activeCheck?.status
+  const highlightLabel =
+    highlightStatus === 'pass'
+      ? 'Matched text'
+      : highlightStatus === 'mismatch'
+        ? 'Confirmed issue'
+        : 'Human review area'
 
   function selectCheck(id: ReviewCheck['id']) {
     setSelectedCheck((current) => (current === id ? null : id))
@@ -90,7 +97,7 @@ export function ReviewResults({ result, previewUrl, fileName }: Props) {
           <p className="eyebrow">Review complete</p>
           <h2 id="results-title">
             {result.status === 'mismatch'
-              ? `${mismatches} discrepancy${mismatches === 1 ? '' : 'ies'} found`
+              ? `${mismatches} ${mismatches === 1 ? 'discrepancy' : 'discrepancies'} found`
               : result.status === 'needs_review'
                 ? 'Content checked; human review remains'
                 : 'All automated checks passed'}
@@ -113,13 +120,17 @@ export function ReviewResults({ result, previewUrl, fileName }: Props) {
               <span>Label artwork</span>
               <strong>{highlight ? activeCheck?.label : 'Select a highlighted result'}</strong>
             </div>
-            {highlight && <span className="highlight-key"><i /> OCR-detected text</span>}
+            {highlight && (
+              <span className={`highlight-key highlight-${highlightStatus}`}>
+                <i /> {highlightLabel}
+              </span>
+            )}
           </div>
           <div className="results-preview-frame" id="results-label-preview">
             <img src={previewUrl} alt="Alcohol label used for this review" />
             {highlight?.boxes.map((box, index) => (
               <span
-                className="ocr-highlight-box"
+                className={`ocr-highlight-box highlight-${highlightStatus}`}
                 aria-hidden="true"
                 key={`${box.x0}-${box.y0}-${index}`}
                 style={{

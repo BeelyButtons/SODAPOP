@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GOVERNMENT_WARNING, INITIAL_APPLICATION, type OcrWord } from './reviewSchema'
-import { verifyLabel } from './verifyLabel'
+import { findImproperlyBoldWarningBody, verifyLabel } from './verifyLabel'
 
 const validOcrText = `
 OLD TOM DISTILLERY
@@ -20,6 +20,58 @@ function review(text = validOcrText, confidence = 95) {
 }
 
 describe('verifyLabel', () => {
+  function warningWords(firstLineRatio: number): OcrWord[] {
+    const firstLine = [
+      'GOVERNMENT',
+      'WARNING:',
+      '(1)',
+      'According',
+      'to',
+      'the',
+      'Surgeon',
+      'General,',
+      'women',
+      'should',
+      'not',
+    ]
+    const laterLines = [
+      ['drink', 'alcoholic', 'beverages', 'during', 'pregnancy', 'because'],
+      ['Consumption', 'impairs', 'your', 'ability', 'to', 'drive'],
+    ]
+    const words: OcrWord[] = firstLine.map((text, index) => ({
+      text,
+      confidence: 96,
+      inkRatio: index < 2 ? 0.51 : firstLineRatio,
+      bbox: { x0: 10 + index * 35, y0: 100, x1: 38 + index * 35, y1: 118 },
+    }))
+    laterLines.forEach((line, lineIndex) => {
+      words.push(
+        ...line.map((text, index) => ({
+          text,
+          confidence: 96,
+          inkRatio: 0.39,
+          bbox: {
+            x0: 10 + index * 45,
+            y0: 135 + lineIndex * 35,
+            x1: 45 + index * 45,
+            y1: 153 + lineIndex * 35,
+          },
+        })),
+      )
+    })
+    return words
+  }
+
+  it('does not flag a normally weighted warning body as bold', () => {
+    expect(findImproperlyBoldWarningBody(warningWords(0.4), 500, 300)).toBeUndefined()
+  })
+
+  it('flags and locates a warning body that is materially bolder than later lines', () => {
+    const result = findImproperlyBoldWarningBody(warningWords(0.47), 500, 300)
+
+    expect(result?.region.boxes).toHaveLength(9)
+  })
+
   it('passes matching application fields and exact warning text', () => {
     const outcome = review()
 

@@ -32,17 +32,19 @@ function normalizedToken(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]/g, '')
 }
 
-export function findGovernmentWarningRegion(
-  words: OcrWord[],
-  imageWidth: number,
-  imageHeight: number,
-): HighlightRegion | undefined {
-  if (!imageWidth || !imageHeight) return undefined
+function median(values: number[]) {
+  if (!values.length) return 0
+  const sorted = [...values].sort((left, right) => left - right)
+  const middle = Math.floor(sorted.length / 2)
+  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2
+}
+
+function governmentWarningWords(words: OcrWord[]) {
   const tokens = words.map((word) => normalizedToken(word.text))
   const start = tokens.findIndex(
     (token, index) => token === 'government' && tokens[index + 1] === 'warning',
   )
-  if (start < 0) return undefined
+  if (start < 0) return []
 
   let end = Math.min(words.length, start + normalizeWords(GOVERNMENT_WARNING).split(' ').length + 8)
   for (let index = start + 2; index < Math.min(words.length - 1, end); index += 1) {
@@ -51,9 +53,52 @@ export function findGovernmentWarningRegion(
       break
     }
   }
+  return words.slice(start, end)
+}
 
-  const boxes = words
-    .slice(start, end)
+export function findImproperlyBoldWarningBody(
+  words: OcrWord[],
+  imageWidth: number,
+  imageHeight: number,
+) {
+  const warningWords = governmentWarningWords(words)
+  const firstBodyWord = warningWords[2]
+  if (!firstBodyWord || !imageWidth || !imageHeight) return undefined
+
+  const firstCenter = (firstBodyWord.bbox.y0 + firstBodyWord.bbox.y1) / 2
+  const firstHeight = firstBodyWord.bbox.y1 - firstBodyWord.bbox.y0
+  const bodyWords = warningWords.slice(2).filter((word) => typeof word.inkRatio === 'number')
+  const firstLineBody = bodyWords.filter((word) => {
+    const center = (word.bbox.y0 + word.bbox.y1) / 2
+    const height = word.bbox.y1 - word.bbox.y0
+    return Math.abs(center - firstCenter) <= Math.max(firstHeight, height) * 0.72
+  })
+  const laterBody = bodyWords.filter((word) => !firstLineBody.includes(word))
+  if (firstLineBody.length < 3 || laterBody.length < 6) return undefined
+
+  const firstLineRatio = median(firstLineBody.map((word) => word.inkRatio ?? 0))
+  const laterRatio = median(laterBody.map((word) => word.inkRatio ?? 0))
+  const clearlyBold = firstLineRatio >= laterRatio * 1.12 && firstLineRatio - laterRatio >= 0.04
+  if (!clearlyBold) return undefined
+
+  return {
+    region: {
+      boxes: firstLineBody.map((word) => word.bbox),
+      imageWidth,
+      imageHeight,
+    } satisfies HighlightRegion,
+    firstLineRatio,
+    laterRatio,
+  }
+}
+
+export function findGovernmentWarningRegion(
+  words: OcrWord[],
+  imageWidth: number,
+  imageHeight: number,
+): HighlightRegion | undefined {
+  if (!imageWidth || !imageHeight) return undefined
+  const boxes = governmentWarningWords(words)
     .filter((word) => word.confidence >= 20)
     .map((word) => word.bbox)
     .filter((box) => box.x1 > box.x0 && box.y1 > box.y0)
@@ -187,6 +232,7 @@ function warningChecks(
   confidence: number,
   containerVolumeMl: number,
   highlight?: HighlightRegion,
+  improperBoldBody?: ReturnType<typeof findImproperlyBoldWarningBody>,
 ): ReviewCheck[] {
   const collapsed = collapseWhitespace(text)
   const exactMatch = collapsed.includes(GOVERNMENT_WARNING)
@@ -213,7 +259,7 @@ function warningChecks(
   }
 
   const uppercaseHeading = collapsed.includes('GOVERNMENT WARNING:')
-  const formatStatus: CheckStatus = uppercaseHeading ? 'needs_review' : 'mismatch'
+  const formatStatus: CheckStatus = uppercaseHeading && !improperBoldBody ? 'needs_review' : 'mismatch'
   const minimumTypeSize = containerVolumeMl > 3000 ? 3 : containerVolumeMl > 237 ? 2 : 1
   const maximumCharactersPerInch = minimumTypeSize === 3 ? 12 : minimumTypeSize === 2 ? 25 : 40
 
@@ -232,13 +278,17 @@ function warningChecks(
       label: 'Government warning format',
       status: formatStatus,
       expected: `Uppercase bold heading; remaining text not bold; at least ${minimumTypeSize} mm type and no more than ${maximumCharactersPerInch} characters per inch; contrasting background and separation from other information.`,
-      observed: uppercaseHeading
-        ? 'Uppercase heading detected; physical formatting is not measurable from this image.'
+      observed: improperBoldBody
+        ? 'Body text immediately following the heading appears bold.'
+        : uppercaseHeading
+          ? 'Uppercase heading detected; remaining physical formatting requires visual confirmation.'
         : 'Required uppercase heading was not detected.',
-      explanation: uppercaseHeading
-        ? 'Confirm bolding, type size, contrast, and separation visually. A photo has no reliable physical scale.'
+      explanation: improperBoldBody
+        ? 'Only “GOVERNMENT WARNING” may be bold. The detected bold body text does not comply.'
+        : uppercaseHeading
+          ? 'No clear body-bolding problem was detected. Confirm heading weight, type size, contrast, and separation visually.'
         : 'The heading must read “GOVERNMENT WARNING” in uppercase before visual formatting review.',
-      highlight,
+      highlight: improperBoldBody?.region ?? highlight,
     },
   ]
 }
@@ -252,6 +302,7 @@ export function verifyLabel(input: VerificationInput): ReviewOutcome {
     imageWidth,
     imageHeight,
   )
+  const improperBoldBody = findImproperlyBoldWarningBody(words, imageWidth, imageHeight)
   const brandCheck = textMatchCheck('brand', 'Brand name', input.application.brandName, input.ocrText)
   const classTypeCheck = textMatchCheck(
     'classType',
@@ -278,6 +329,7 @@ export function verifyLabel(input: VerificationInput): ReviewOutcome {
       input.ocrConfidence,
       input.application.containerVolumeMl,
       warningHighlight,
+      improperBoldBody,
     ),
   ]
 

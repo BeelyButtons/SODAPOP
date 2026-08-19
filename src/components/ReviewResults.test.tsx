@@ -44,7 +44,26 @@ describe('ReviewResults', () => {
     expect(container.querySelectorAll('.ocr-highlight-box')).toHaveLength(0)
     await user.hover(screen.getByRole('button', { name: /Government warning wording/i }))
     expect(container.querySelectorAll('.ocr-highlight-box')).toHaveLength(1)
-    expect(screen.getByText('OCR-detected text')).toBeInTheDocument()
+    expect(screen.getByText('Matched text')).toBeInTheDocument()
+    expect(container.querySelector('.ocr-highlight-box')).toHaveClass('highlight-pass')
+  })
+
+  it('uses red highlighting for confirmed mismatches', async () => {
+    const user = userEvent.setup()
+    const mismatchResult: ReviewOutcome = {
+      ...result,
+      status: 'mismatch',
+      checks: result.checks.map((check) =>
+        check.id === 'warningText' ? { ...check, status: 'mismatch' as const } : check,
+      ),
+    }
+    const { container } = render(
+      <ReviewResults result={mismatchResult} previewUrl="label.png" fileName="label.png" />,
+    )
+
+    await user.hover(screen.getByRole('button', { name: /Government warning wording/i }))
+    expect(screen.getByText('Confirmed issue')).toBeInTheDocument()
+    expect(container.querySelector('.ocr-highlight-box')).toHaveClass('highlight-mismatch')
   })
 
   it('keeps a highlight selected after pointer hover ends', async () => {

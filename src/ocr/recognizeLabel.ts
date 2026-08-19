@@ -67,6 +67,7 @@ type TesseractWord = {
   text: string
   confidence: number
   bbox: OcrBox
+  font_name?: string
 }
 
 type TesseractBlock = {
@@ -87,10 +88,29 @@ function flattenWords(blocks: unknown): OcrWord[] {
           text: word.text,
           confidence: word.confidence,
           bbox: word.bbox,
+          fontName: word.font_name,
         })),
       ),
     ),
   )
+}
+
+function measureInkRatio(canvas: HTMLCanvasElement, box: OcrBox) {
+  const context = canvas.getContext('2d', { willReadFrequently: true })
+  if (!context) return undefined
+  const x0 = Math.max(0, Math.floor(box.x0))
+  const y0 = Math.max(0, Math.floor(box.y0))
+  const x1 = Math.min(canvas.width, Math.ceil(box.x1))
+  const y1 = Math.min(canvas.height, Math.ceil(box.y1))
+  if (x1 <= x0 || y1 <= y0) return undefined
+
+  const pixels = context.getImageData(x0, y0, x1 - x0, y1 - y0).data
+  const luminances: number[] = []
+  for (let index = 0; index < pixels.length; index += 4) luminances.push(pixels[index])
+  const sorted = [...luminances].sort((left, right) => left - right)
+  const background = sorted[Math.floor(sorted.length / 2)] ?? 255
+  const foregroundPixels = luminances.filter((value) => Math.abs(value - background) >= 38).length
+  return foregroundPixels / Math.max(1, luminances.length)
 }
 
 async function preprocessImage(file: File) {
@@ -149,11 +169,18 @@ export async function recognizeLabel(
       30_000,
       'The label review exceeded 30 seconds. Try a smaller or clearer image.',
     )
+    const words = flattenWords(result.data.blocks).map((word) => ({
+      ...word,
+      inkRatio:
+        prepared.image instanceof HTMLCanvasElement
+          ? measureInkRatio(prepared.image, word.bbox)
+          : undefined,
+    }))
     return {
       text: result.data.text,
       confidence: result.data.confidence,
       durationMs: performance.now() - startedAt,
-      words: flattenWords(result.data.blocks),
+      words,
       imageWidth: prepared.width,
       imageHeight: prepared.height,
     }
