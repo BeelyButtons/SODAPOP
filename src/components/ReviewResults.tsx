@@ -18,8 +18,11 @@ type Props = {
   initialDecisions?: StaffDecisions
   initialRotation?: SavedRotation
   recordedDecision?: QueueDecision
+  amendmentCheckId?: ReviewCheck['id']
   onFinalDecision?: (decision: QueueDecision, decisions: StaffDecisions, rotation: SavedRotation) => void
   onPause?: () => void
+  pauseLabel?: string
+  onChangeDecision?: (id: ReviewCheck['id']) => void
 }
 
 function CheckCard({
@@ -28,20 +31,26 @@ function CheckCard({
   decision,
   readOnly,
   recordedDecision,
+  amendmentCheckId,
   onDecision,
   onPreview,
   onSelect,
+  onChangeDecision,
 }: {
   check: ReviewCheck
   active: boolean
   decision?: QueueDecision
   readOnly: boolean
   recordedDecision?: QueueDecision
+  amendmentCheckId?: ReviewCheck['id']
   onDecision: (id: ReviewCheck['id'], decision: QueueDecision) => void
   onPreview: (id: ReviewCheck['id'] | null) => void
   onSelect: (id: ReviewCheck['id']) => void
+  onChangeDecision?: (id: ReviewCheck['id']) => void
 }) {
   const interactive = Boolean(check.highlight)
+  const decisionLocked = readOnly || Boolean(amendmentCheckId && decision && check.id !== amendmentCheckId)
+  const humanReviewLead = check.id === 'warningFormat' && check.status === 'needs_review'
 
   function selectFromCard(event: MouseEvent<HTMLElement>) {
     if (!interactive || (event.target as HTMLElement).closest('button')) return
@@ -71,19 +80,24 @@ function CheckCard({
           <span className={`status-icon status-${check.status}`} aria-hidden="true">
             {check.status === 'pass' ? '✓' : check.status === 'mismatch' ? '×' : '?'}
           </span>
-          <h3><span>{check.label}:</span> {check.expected}</h3>
+          <h3><span>{check.label}:</span> <span className="check-requirement">{check.expected}</span></h3>
         </div>
         <span className={`status-badge status-${check.status}`}>{statusLabels[check.status]}</span>
       </div>
 
       <p className="check-explanation">
-        <strong>AI determination: {statusLabels[check.status]}.</strong> {check.explanation}
+        <strong>{humanReviewLead ? 'AI determination: Human review required — not an automated failure.' : `AI determination: ${statusLabels[check.status]}.`}</strong> {check.explanation}
       </p>
 
-      {readOnly ? (
-        <div className={`locked-decision locked-${decision ?? 'unknown'}`}>
-          <span>Staff determination</span>
-          <strong>{decision ? (decision === 'pass' ? 'Pass' : 'Fail') : recordedDecision === 'fail' ? 'Not required after confirmed failure' : 'Not recorded'}</strong>
+      {decisionLocked ? (
+        <div className="locked-decision-row">
+          <div className={`locked-decision locked-${decision ?? 'unknown'}`}>
+            <span>Staff determination</span>
+            <strong>{decision ? (decision === 'pass' ? 'Pass' : 'Fail') : recordedDecision === 'fail' ? 'Not required after confirmed failure' : 'Not recorded'}</strong>
+          </div>
+          {readOnly && onChangeDecision && (
+            <button className="change-decision-button" type="button" onClick={() => onChangeDecision(check.id)}>Change decision</button>
+          )}
         </div>
       ) : (
         <fieldset className="staff-decision">
@@ -124,14 +138,20 @@ export function ReviewResults({
   initialDecisions = {},
   initialRotation = 0,
   recordedDecision,
+  amendmentCheckId,
   onFinalDecision,
   onPause,
+  pauseLabel = 'Pause review',
+  onChangeDecision,
 }: Props) {
   const [previewedCheck, setPreviewedCheck] = useState<ReviewCheck['id'] | null>(null)
   const [selectedCheck, setSelectedCheck] = useState<ReviewCheck['id'] | null>(null)
   const [staffDecisions, setStaffDecisions] = useState<StaffDecisions>(initialDecisions)
   const [pendingFail, setPendingFail] = useState<ReviewCheck['id'] | null>(null)
   const [pendingPass, setPendingPass] = useState(false)
+  const [pendingAmendmentFinal, setPendingAmendmentFinal] = useState<QueueDecision | null>(null)
+  const [pendingChangeId, setPendingChangeId] = useState<ReviewCheck['id'] | null>(null)
+  const [amendmentTouched, setAmendmentTouched] = useState(false)
   const [submittedDecision, setSubmittedDecision] = useState<QueueDecision | null>(null)
   const [savedRotation, setSavedRotation] = useState<SavedRotation>(initialRotation)
   const [draftRotation, setDraftRotation] = useState<SavedRotation>(initialRotation)
@@ -148,6 +168,11 @@ export function ReviewResults({
   const highlight = activeCheck?.highlight
   const highlightStatus = activeCheck?.status
   const decidedCount = result.checks.filter((check) => staffDecisions[check.id]).length
+  const amendmentFinalDecision: QueueDecision | null = result.checks.some((check) => staffDecisions[check.id] === 'fail')
+    ? 'fail'
+    : result.checks.every((check) => staffDecisions[check.id] === 'pass')
+      ? 'pass'
+      : null
   const dimensions = result.checks.find((check) => check.highlight)?.highlight
   const sourceWidth = dimensions?.imageWidth ?? naturalSize.width
   const sourceHeight = dimensions?.imageHeight ?? naturalSize.height
@@ -168,6 +193,7 @@ export function ReviewResults({
   }
 
   function recordDecision(id: ReviewCheck['id'], decision: QueueDecision) {
+    if (amendmentCheckId) setAmendmentTouched(true)
     if (decision === 'fail') {
       setPendingFail(id)
       return
@@ -184,15 +210,22 @@ export function ReviewResults({
   }
 
   function confirmQuickFail() {
-    if (!pendingFail) return
-    const next = { ...staffDecisions, [pendingFail]: 'fail' as const }
-    setStaffDecisions(next)
-    setPendingFail(null)
-    submit('fail', next)
+    if (pendingFail) {
+      const next = { ...staffDecisions, [pendingFail]: 'fail' as const }
+      setStaffDecisions(next)
+      setPendingFail(null)
+      submit('fail', next)
+      return
+    }
+    if (pendingAmendmentFinal === 'fail') {
+      setPendingAmendmentFinal(null)
+      submit('fail', staffDecisions)
+    }
   }
 
   function confirmPass() {
     setPendingPass(false)
+    setPendingAmendmentFinal(null)
     submit('pass', staffDecisions)
   }
 
@@ -204,14 +237,14 @@ export function ReviewResults({
     setSavedRotation(draftRotation)
   }
 
-  const dialogDecision = pendingFail ? 'fail' : pendingPass ? 'pass' : null
+  const dialogDecision = pendingFail ? 'fail' : pendingPass ? 'pass' : pendingAmendmentFinal
 
   return (
     <section className="results-section" aria-labelledby="results-title">
       <div className="review-command-bar">
         <div>
-          <h2 id="results-title">{readOnly ? 'Completed label decision' : 'Make your label compliance determination'}</h2>
-          <strong>{readOnly ? `Final decision: ${recordedDecision === 'pass' ? 'Pass' : 'Fail'}` : `${decidedCount} of ${result.checks.length} decided`}</strong>
+          <h2 id="results-title">{readOnly ? 'Completed label decision' : amendmentCheckId ? 'Update this label compliance determination' : 'Make your label compliance determination'}</h2>
+          <strong>{readOnly ? `Final decision: ${recordedDecision === 'pass' ? 'Pass' : 'Fail'}` : `${decidedCount} of ${result.checks.length} decided${amendmentCheckId ? ' · previous answers preserved' : ''}`}</strong>
         </div>
         <div className="compact-metrics">
           <span><strong>{Math.round(result.ocrConfidence)}%</strong> OCR confidence</span>
@@ -219,7 +252,7 @@ export function ReviewResults({
             <strong>{(result.durationMs / 1000).toFixed(1)}s</strong> {result.durationMs <= 5000 ? 'within target' : 'above target'}
           </span>
         </div>
-        {!readOnly && onPause && <button className="secondary-button" type="button" onClick={onPause}>Pause review</button>}
+        {!readOnly && onPause && <button className="secondary-button" type="button" onClick={onPause}>{pauseLabel}</button>}
       </div>
 
       <div className="results-comparison">
@@ -271,9 +304,11 @@ export function ReviewResults({
                 key={check.id}
                 readOnly={readOnly}
                 recordedDecision={recordedDecision}
+                amendmentCheckId={amendmentCheckId}
                 onDecision={recordDecision}
                 onPreview={setPreviewedCheck}
                 onSelect={selectCheck}
+                onChangeDecision={onChangeDecision ? setPendingChangeId : undefined}
               />
             ))}
           </div>
@@ -281,8 +316,39 @@ export function ReviewResults({
         </div>
       </div>
 
+      {amendmentCheckId && amendmentTouched && amendmentFinalDecision && !dialogDecision && (
+        <div className={`amendment-submit amendment-submit-${amendmentFinalDecision}`}>
+          <div>
+            <strong>Updated final determination: {amendmentFinalDecision === 'pass' ? 'Pass' : 'Fail'}</strong>
+            <span>Submit to create a new revision. The previous decision will remain in history.</span>
+          </div>
+          <button
+            className={amendmentFinalDecision === 'pass' ? 'confirm-pass-button' : 'confirm-fail-button'}
+            type="button"
+            onClick={() => amendmentFinalDecision === 'pass' ? setPendingPass(true) : setPendingAmendmentFinal('fail')}
+          >
+            Submit updated decision
+          </button>
+        </div>
+      )}
+
       {submittedDecision && !onFinalDecision && (
         <p className={`decision-recorded-banner decision-${submittedDecision}`} role="status">Final {submittedDecision === 'pass' ? 'Pass' : 'Fail'} decision recorded for this browser session.</p>
+      )}
+
+      {pendingChangeId && (
+        <div className="quick-fail-backdrop" role="presentation">
+          <section className="quick-fail-dialog change-decision-dialog" role="alertdialog" aria-modal="true" aria-labelledby="change-dialog-title">
+            <span className="quick-fail-icon" aria-hidden="true">↻</span>
+            <p className="eyebrow">Change a completed decision</p>
+            <h2 id="change-dialog-title">Change the staff decision for {result.checks.find((check) => check.id === pendingChangeId)?.label}?</h2>
+            <p>Your previous answers will be preserved. Nothing changes until you submit an updated final decision.</p>
+            <div>
+              <button className="secondary-button" type="button" onClick={() => setPendingChangeId(null)}>Keep completed decision</button>
+              <button className="primary-button" type="button" onClick={() => { const id = pendingChangeId; setPendingChangeId(null); onChangeDecision?.(id) }} autoFocus>Continue to change decision</button>
+            </div>
+          </section>
+        </div>
       )}
 
       {dialogDecision && (
@@ -293,7 +359,7 @@ export function ReviewResults({
             <h2 id="decision-dialog-title">Confirm this label has {dialogDecision === 'pass' ? 'passed' : 'failed'}?</h2>
             <p>{dialogDecision === 'pass' ? 'Every item is marked Pass. Confirm the final compliant-label decision.' : 'Confirming records a final Fail without requiring answers for the remaining checks.'}</p>
             <div>
-              <button className="secondary-button" type="button" onClick={() => { setPendingFail(null); setPendingPass(false) }}>Go back to review</button>
+              <button className="secondary-button" type="button" onClick={() => { setPendingFail(null); setPendingPass(false); setPendingAmendmentFinal(null) }}>Go back to review</button>
               <button className={dialogDecision === 'pass' ? 'confirm-pass-button' : 'confirm-fail-button'} type="button" onClick={dialogDecision === 'pass' ? confirmPass : confirmQuickFail} autoFocus>
                 Confirm {dialogDecision === 'pass' ? 'Pass decision' : 'failure'}
               </button>

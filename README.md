@@ -10,7 +10,8 @@ SODAPOP — System for Optical Detection, Analysis & Packaging-Oversight Process
 - Resumable demonstration review queue: working
 - Quick-fail confirmation and automatic move to the next label: working
 - Remaining-only queue with locked completed-decision history: working
-- Review-again workflow that returns to completed decisions: working
+- Searchable, filterable, date-sortable completed-decision history: working
+- Per-card decision changes with preserved answers and immutable revisions: working
 - Sticky reviewer controls with OCR confidence and elapsed time: working
 - Saved 90-degree label rotation without an OCR rerun: working
 - Staff Pass/Fail determination for every reviewed item: working
@@ -21,7 +22,7 @@ SODAPOP — System for Optical Detection, Analysis & Packaging-Oversight Process
 - Angled-label deskewing and orientation-aware highlights: working
 - Conditional glare and alternate-orientation OCR retries: working
 - URL-aware SPA views for the queue, individual cases, new-label intake, and results: working
-- Automated verification: 37 tests, GitHub Pages production build, and lint checks passing
+- Automated verification: 46 tests, GitHub Pages production build, and lint checks passing
 - Batch review: planned after the single-label workflow is validated
 - Live URL: [https://beelybuttons.github.io/SODAPOP/](https://beelybuttons.github.io/SODAPOP/)
 
@@ -41,17 +42,19 @@ SODAPOP — System for Optical Detection, Analysis & Packaging-Oversight Process
 12. Allows a reviewer to confirm a failure immediately after the first failed item instead of answering irrelevant remaining questions.
 13. Confirms a passing decision after every item is marked `Pass`, without a separate final-decision section.
 14. Moves to the next queued label after the final decision and returns to an empty queue when work is complete.
-15. Stores completed decisions in a separate locked history with an explicit Review Label Again action.
-16. Rotates any label preview in 90-degree steps while keeping OCR highlights aligned, without rerunning OCR for a display-only change.
-17. Measures processing time against the five-second usability target.
+15. Stores completed decisions in a searchable history that can be filtered by Pass or Fail and sorted by decision time.
+16. Gives every submitted decision a unique ID and preserves earlier revisions instead of overwriting them.
+17. Lets staff change an individual card decision while retaining prior answers and requiring a newly submitted final determination.
+18. Rotates any label preview in 90-degree steps while keeping OCR highlights aligned, without rerunning OCR for a display-only change.
+19. Measures processing time against the five-second usability target.
 
 The application uses meaningful browser routes even though it remains a client-side SPA:
 
 - `/SODAPOP/review` — review portal and demonstration queue
 - `/SODAPOP/review/:case-id` — an individual queued-label review
 - `/SODAPOP/review/completed` — completed label decisions
-- `/SODAPOP/review/completed/:case-id` — locked completed review
-- `/SODAPOP/review/completed/:case-id/review-again` — editable repeat review that returns to history
+- `/SODAPOP/review/completed/:decision-id` — an immutable completed-decision revision
+- `/SODAPOP/review/completed/:decision-id/change/:check-id` — a confirmed per-card decision amendment
 - `/SODAPOP/review/new` — application values and independent label intake
 - `/SODAPOP/results` — automated evidence, staff determinations, and final decision
 
@@ -61,7 +64,7 @@ The included synthetic cases demonstrate a matching label, incorrect ABV, incorr
 
 ## Product direction and iterative improvement
 
-The workflow is being improved through repeated hands-on review by the project owner in collaboration with Codex. The project owner has driven the practical improvements: simplifying the opening experience, moving privacy information out of the way, making the label easier to inspect, identifying misleading sample-label behavior, requesting status-aware highlights, broadening the test-label designs, and requiring an explicit staff decision instead of treating automation as approval.
+The workflow is being improved through repeated hands-on review by the project owner in collaboration with Codex. The project owner has driven the practical improvements: simplifying the opening experience, moving privacy information out of the way, making the label easier to inspect, identifying misleading sample-label behavior, requesting status-aware highlights, broadening the test-label designs, requiring an explicit staff decision instead of treating automation as approval, and replacing destructive re-review with a reviewer-friendly correction and audit-history workflow.
 
 That iterative review materially changed the product from a basic OCR comparison demo into a staff-centered decision-support workflow. The project owner's latest review introduced the portal, persistent queue, sequential review experience, accessible evidence hierarchy, and quick-fail path. Each improvement is evaluated against a simple principle: automation should help staff locate and understand evidence, while staff retain responsibility for the regulatory determination.
 
@@ -69,6 +72,7 @@ That iterative review materially changed the product from a basic OCR comparison
 
 - Every unfinished synthetic case is visible in `Labels to Review` with its purpose.
 - Completed cases leave `Labels to Review`; the portal shows only unfinished work and a single Remaining count.
+- Remaining work is renumbered from 1 each time, and the confirmed queue-reset control sits beside the Remaining count it affects.
 - `Start / Restart label reviews` opens the first unfinished case; `Pause review` returns to the queue without discarding completed decisions.
 - Each case has a meaningful browser URL, and the original independent upload form remains available under `New label`.
 - Queue progress is stored only in the current browser and can be reset from the portal.
@@ -78,8 +82,10 @@ That iterative review materially changed the product from a basic OCR comparison
 - A Fail selection requires explicit confirmation, then records the label failure without forcing the reviewer through the remaining cards.
 - Mismatches appear first in prominent red cards, human-review findings follow in amber, and confident passes come last.
 - A sticky command bar keeps staff progress, OCR confidence, elapsed time, and Pause visible while the cards scroll.
-- Compact cards combine the checked item with its application requirement and remove duplicate observed-text and location-link clutter.
-- Completed decisions are locked against accidental edits. Review Label Again starts a fresh determination and returns to the reviewer’s position in completed history.
+- Compact cards bold only the checked-item name, leaving the application entry or requirement at normal weight for easier reading.
+- Completed decisions are searchable by keyword or decision ID, filterable by outcome, sortable by date, and stamped with the local decision date and time.
+- Completed cards are locked against accidental edits. A confirmed `Change decision` action unlocks only the selected decision and any unanswered quick-fail cards; previously answered cards remain preserved.
+- Every correction creates a uniquely addressed revision. Earlier decisions remain available in the on-screen history instead of being overwritten.
 - Label artwork can be rotated clockwise or counterclockwise and saved at 90-degree intervals. The image and highlight layer rotate together, avoiding an unnecessary OCR rerun and protecting the five-second budget.
 
 ### Recent OCR reliability improvements
@@ -142,7 +148,7 @@ The automated rule checks:
 - Required uppercase `GOVERNMENT WARNING` heading
 - Container-based type-size and characters-per-inch requirement presented to the reviewer
 
-The app compares detected ink density within the warning to flag a clear case where body text appears materially bolder than surrounding body lines. It still returns `Human review` for uncertain weight, physical type size, contrast, and separation when they cannot be proven from a raster image. A photograph has no reliable physical scale, and OCR-based weight detection remains an aid rather than conclusive physical measurement.
+The app compares detected ink density within the warning to flag a clear case where body text appears materially bolder than surrounding body lines. It still returns `Human review` for uncertain weight, physical type size, contrast, and separation when they cannot be proven from a raster image. The interface explicitly describes this state as human review rather than an automated failure. A photograph has no reliable physical scale, and OCR-based weight detection remains an aid rather than conclusive physical measurement.
 
 ## Security, privacy, and retention
 
@@ -151,7 +157,7 @@ This prototype minimizes its data boundary instead of claiming production federa
 - Images are processed locally in browser memory.
 - No image, OCR text, application value, or user identity is uploaded or retained.
 - No database, cookies, analytics, or user accounts are used.
-- Demonstration decisions, per-check staff determinations, automated findings, timing, and saved orientation are stored in local browser storage so staff can pause, inspect locked history, and review a label again. They can be cleared with `Reset review queue` and are never transmitted.
+- Demonstration decisions, immutable revisions, per-check staff determinations, automated findings, timing, and saved orientation are stored in local browser storage so staff can pause, inspect history, and correct a decision without losing prior work. They can be cleared with the confirmed `Reset review queue` action and are never transmitted.
 - Independent uploaded-label decisions remain session-only.
 - Files are limited to 10 MB and validated by size, declared MIME type, and binary signature.
 - Only JPEG, PNG, and WebP inputs are accepted; SVG and executable formats are rejected.
@@ -219,7 +225,7 @@ The current implementation has no application runtime fee: all processing is loc
 
 ## Next increment
 
-1. Validate the new queue, pause/restart behavior, readability, and quick-fail experience with staff reviewers.
+1. Validate the renumbered queue, completed-history controls, per-card correction workflow, readability, and quick-fail experience with staff reviewers.
 2. Continue the single-label rule sequence with deeper brand name, alcohol content, net contents, and additional checks.
 3. Expand browser-level OCR regression benchmarks for angled, glare, dark, and upside-down fixtures.
 4. Add CSV plus multiple-image batch intake with deterministic image-to-row matching.

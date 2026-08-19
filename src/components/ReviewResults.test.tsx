@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { ReviewOutcome } from '../domain/reviewSchema'
 import { ReviewResults } from './ReviewResults'
 
@@ -162,6 +162,13 @@ describe('ReviewResults', () => {
     expect(cards[1]).toHaveAccessibleName(/Government warning wording/i)
   })
 
+  it('distinguishes warning-format human review from an automated failure and keeps the requirement unbolded', () => {
+    const { container } = render(<ReviewResults result={result} previewUrl="label.png" fileName="label.png" />)
+
+    expect(screen.getByText(/Human review required — not an automated failure/i)).toBeInTheDocument()
+    expect(container.querySelector('.check-requirement')).toHaveTextContent('Required format')
+  })
+
   it('rotates in 90-degree steps and requires saving the orientation', async () => {
     const user = userEvent.setup()
     render(<ReviewResults result={result} previewUrl="label.png" fileName="label.png" />)
@@ -190,5 +197,48 @@ describe('ReviewResults', () => {
     expect(screen.getAllByText('Staff determination', { selector: '.locked-decision span' })).toHaveLength(2)
     expect(screen.queryByRole('button', { name: 'Pass' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Fail' })).not.toBeInTheDocument()
+  })
+
+  it('confirms a per-card decision change before opening amendment mode', async () => {
+    const user = userEvent.setup()
+    const onChangeDecision = vi.fn()
+    render(
+      <ReviewResults
+        result={result}
+        previewUrl="label.png"
+        fileName="label.png"
+        readOnly
+        recordedDecision="fail"
+        initialDecisions={{ warningText: 'pass', warningFormat: 'fail' }}
+        onChangeDecision={onChangeDecision}
+      />,
+    )
+
+    await user.click(screen.getAllByRole('button', { name: /Change decision/i })[0])
+    expect(onChangeDecision).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: /Continue to change decision/i }))
+    expect(onChangeDecision).toHaveBeenCalledWith('warningFormat')
+  })
+
+  it('preserves prior answers while allowing the selected decision to be amended', async () => {
+    const user = userEvent.setup()
+    const onFinalDecision = vi.fn()
+    render(
+      <ReviewResults
+        result={result}
+        previewUrl="label.png"
+        fileName="label.png"
+        recordedDecision="fail"
+        initialDecisions={{ warningText: 'pass', warningFormat: 'fail' }}
+        amendmentCheckId="warningFormat"
+        onFinalDecision={onFinalDecision}
+      />,
+    )
+
+    expect(screen.getAllByText('Staff determination', { selector: '.locked-decision span' })).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: 'Pass' })).toHaveLength(1)
+    await user.click(screen.getByRole('button', { name: 'Pass' }))
+    await user.click(screen.getByRole('button', { name: /Confirm Pass decision/i }))
+    expect(onFinalDecision).toHaveBeenCalledWith('pass', { warningText: 'pass', warningFormat: 'pass' }, 0)
   })
 })

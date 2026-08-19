@@ -11,19 +11,25 @@ import {
   applicationSchema,
   validateImageFile,
   type ApplicationData,
+  type ReviewCheck,
   type ReviewOutcome,
 } from './domain/reviewSchema'
 import { verifyLabel } from './domain/verifyLabel'
 import { recognizeLabel, warmOcrEngine, type OcrProgress } from './ocr/recognizeLabel'
 import { appUrl, useAppRoute, type AppRoute } from './routing'
 import {
+  appendReviewRecord,
+  changeDecisionFromRoute,
   clearQueueProgress,
   completedIdFromRoute,
+  currentReviewForSample,
+  emptyQueueProgress,
   nextRemainingSample,
   queueIdFromRoute,
   queueSample,
   readQueueProgress,
-  repeatIdFromRoute,
+  reviewHistoryForSample,
+  reviewRecordById,
   saveQueueProgress,
   type QueueDecision,
   type QueueProgress,
@@ -44,14 +50,19 @@ function App() {
   const [queueProgress, setQueueProgress] = useState<QueueProgress>(readQueueProgress)
   const processingQueueCase = useRef<string | null>(null)
   const completedScrollPosition = useRef(0)
-  const repeatQueueId = repeatIdFromRoute(route)
-  const completedQueueId = completedIdFromRoute(route)
-  const activeQueueId = repeatQueueId ?? queueIdFromRoute(route)
+  const changeDecisionRoute = changeDecisionFromRoute(route)
+  const completedReviewId = completedIdFromRoute(route)
+  const activeQueueId = queueIdFromRoute(route)
   const activeQueueSample = queueSample(activeQueueId)
-  const completedQueueSample = queueSample(completedQueueId)
-  const completedRecord = completedQueueId ? queueProgress[completedQueueId] : undefined
-  const repeatRecord = repeatQueueId ? queueProgress[repeatQueueId] : undefined
-  const isRepeatReview = Boolean(repeatQueueId)
+  const completedRecord = reviewRecordById(queueProgress, completedReviewId)
+  const completedQueueSample = queueSample(completedRecord?.sampleId ?? null)
+  const amendmentRecord = reviewRecordById(queueProgress, changeDecisionRoute?.reviewId ?? null)
+  const amendmentQueueSample = queueSample(amendmentRecord?.sampleId ?? null)
+  const amendmentCheckId = changeDecisionRoute?.checkId
+  const completedHistory = completedQueueSample ? reviewHistoryForSample(queueProgress, completedQueueSample.id) : []
+  const isCurrentCompletedRecord = Boolean(
+    completedRecord && currentReviewForSample(queueProgress, completedRecord.sampleId)?.id === completedRecord.id,
+  )
 
   const previewUrl = useMemo(() => (file ? URL.createObjectURL(file) : null), [file])
   useEffect(() => {
@@ -67,24 +78,34 @@ function App() {
   useEffect(() => {
     if (route === '/results' && !result) navigate('/review', true)
     if (activeQueueId && !activeQueueSample) navigate('/review', true)
-    if (completedQueueId && (!completedQueueSample || !completedRecord)) navigate('/review/completed', true)
+    if (completedReviewId && (!completedQueueSample || !completedRecord)) navigate('/review/completed', true)
+    if (changeDecisionRoute && (
+      !amendmentQueueSample ||
+      !amendmentRecord?.result ||
+      !amendmentRecord.result.checks.some((check) => check.id === amendmentCheckId)
+    )) navigate(amendmentRecord ? `/review/completed/${amendmentRecord.id}` : '/review/completed', true)
     document.title = route === '/review'
       ? 'Review portal · SODAPOP'
       : route === '/review/completed'
         ? 'Completed reviews · SODAPOP'
       : route === '/review/new'
         ? 'New label review · SODAPOP'
+        : changeDecisionRoute
+          ? 'Change decision · SODAPOP'
+        : completedReviewId
+          ? 'Completed decision · SODAPOP'
         : 'Review results · SODAPOP'
-  }, [activeQueueId, activeQueueSample, completedQueueId, completedQueueSample, completedRecord, navigate, result, route])
+  }, [activeQueueId, activeQueueSample, amendmentCheckId, amendmentQueueSample, amendmentRecord, changeDecisionRoute, completedQueueSample, completedRecord, completedReviewId, navigate, result, route])
 
   useEffect(() => {
-    if (!completedQueueSample || file) return
+    const savedQueueSample = completedQueueSample ?? amendmentQueueSample
+    if (!savedQueueSample || file) return
     let cancelled = false
-    void createSampleFile(completedQueueSample.id).then((sampleFile) => {
+    void createSampleFile(savedQueueSample.id).then((sampleFile) => {
       if (!cancelled) setFile(sampleFile)
     })
     return () => { cancelled = true }
-  }, [completedQueueSample, file])
+  }, [amendmentQueueSample, completedQueueSample, file])
 
   useEffect(() => {
     if (!activeQueueSample || result || processingQueueCase.current === activeQueueSample.id) return
@@ -249,7 +270,7 @@ function App() {
 
   function resetQueue() {
     clearQueueProgress()
-    setQueueProgress({})
+    setQueueProgress(emptyQueueProgress())
   }
 
   function completeQueueCase(
@@ -257,27 +278,29 @@ function App() {
     staffDecisions: StaffDecisions,
     rotationDegrees: SavedRotation,
   ) {
-    if (!activeQueueSample) return
-    const updated = {
-      ...queueProgress,
-      [activeQueueSample.id]: {
+    const reviewSample = amendmentQueueSample ?? activeQueueSample
+    if (!reviewSample) return
+    const saved = appendReviewRecord(
+      queueProgress,
+      reviewSample.id,
+      {
         finalDecision: decision,
         staffDecisions,
-        result: result ?? undefined,
+        result: amendmentRecord?.result ?? result ?? undefined,
         rotationDegrees,
         completedAt: new Date().toISOString(),
       },
-    }
-    saveQueueProgress(updated)
-    setQueueProgress(updated)
-    if (isRepeatReview) {
+      amendmentRecord?.id,
+    )
+    saveQueueProgress(saved.progress)
+    setQueueProgress(saved.progress)
+    if (amendmentRecord) {
       setResult(null)
       setFile(null)
-      navigate('/review/completed')
-      window.setTimeout(() => window.scrollTo({ top: completedScrollPosition.current }), 0)
+      navigate(`/review/completed/${saved.record.id}`)
       return
     }
-    const next = nextRemainingSample(updated, activeQueueSample.id)
+    const next = nextRemainingSample(saved.progress, reviewSample.id)
     setResult(null)
     setFile(null)
     if (next) navigate(`/review/${next.id}`)
@@ -298,11 +321,11 @@ function App() {
     navigate('/review/completed')
   }
 
-  function openCompletedReview(id: (typeof SAMPLE_LABELS)[number]['id']) {
+  function openCompletedReview(reviewId: string) {
     completedScrollPosition.current = window.scrollY
     setResult(null)
     setFile(null)
-    navigate(`/review/completed/${id}`)
+    navigate(`/review/completed/${reviewId}`)
   }
 
   function returnToCompletedReviews() {
@@ -312,11 +335,17 @@ function App() {
     window.setTimeout(() => window.scrollTo({ top: completedScrollPosition.current }), 0)
   }
 
-  function reviewCompletedAgain(id: (typeof SAMPLE_LABELS)[number]['id']) {
+  function changeCompletedDecision(reviewId: string, checkId: ReviewCheck['id']) {
     setResult(null)
     setFile(null)
     setErrors({})
-    navigate(`/review/completed/${id}/review-again`)
+    navigate(`/review/completed/${reviewId}/change/${checkId}`)
+  }
+
+  function exitDecisionChange() {
+    if (!amendmentRecord) return
+    setFile(null)
+    navigate(`/review/completed/${amendmentRecord.id}`)
   }
 
   return (
@@ -381,12 +410,32 @@ function App() {
                 <p className="eyebrow">Locked completed review</p>
                 <h1>{completedQueueSample.name}</h1>
                 <p>{completedQueueSample.description}</p>
+                <p className="completed-decision-identity">Decision ID {completedRecord.id} · Revision {completedRecord.revision}{completedRecord.completedAt ? ` · ${new Date(completedRecord.completedAt).toLocaleString()}` : ''}</p>
               </div>
               <div className="completed-detail-actions">
                 <button className="secondary-button" type="button" onClick={returnToCompletedReviews}>← Completed reviews</button>
-                <button className="primary-button" type="button" onClick={() => reviewCompletedAgain(completedQueueSample.id)}>Review Label Again</button>
               </div>
             </div>
+            {completedHistory.length > 1 && (
+              <nav className="decision-history" aria-label="Decision revision history">
+                <strong>Decision history</strong>
+                <div>
+                  {completedHistory.map((record) => (
+                    <a
+                      className={record.id === completedRecord.id ? 'active' : ''}
+                      href={appUrl(`/review/completed/${record.id}`)}
+                      key={record.id}
+                      onClick={(event) => routeLink(event, `/review/completed/${record.id}`)}
+                    >
+                      Revision {record.revision}: {record.finalDecision === 'pass' ? 'Pass' : 'Fail'}
+                    </a>
+                  ))}
+                </div>
+              </nav>
+            )}
+            {!isCurrentCompletedRecord && (
+              <div className="earlier-revision-note" role="status">This is an earlier, read-only revision. Open the latest revision from the decision history to make another change.</div>
+            )}
             {completedRecord.result ? (
               previewUrl && file ? (
                 <ReviewResults
@@ -397,12 +446,13 @@ function App() {
                   initialDecisions={completedRecord.staffDecisions}
                   initialRotation={completedRecord.rotationDegrees}
                   recordedDecision={completedRecord.finalDecision}
+                  onChangeDecision={isCurrentCompletedRecord ? (checkId) => changeCompletedDecision(completedRecord.id, checkId) : undefined}
                 />
               ) : <div className="progress-panel"><strong>Loading saved label artwork…</strong></div>
             ) : (
               <div className="legacy-review-note">
                 <h2>Earlier decision: {completedRecord.finalDecision === 'pass' ? 'Pass' : 'Fail'}</h2>
-                <p>This decision predates detailed review history. Choose Review Label Again to create a complete locked record.</p>
+                <p>This decision predates detailed review history, so its individual card decisions cannot be changed.</p>
               </div>
             )}
           </>
@@ -468,7 +518,7 @@ function App() {
         {activeQueueSample && (
           <div className="results-page-heading queue-review-heading">
             <div>
-              <p className="eyebrow">{isRepeatReview ? 'Reviewing completed label again' : 'Queued label review'}</p>
+              <p className="eyebrow">Queued label review</p>
               <h1>{activeQueueSample.name}</h1>
               <p>{activeQueueSample.description}</p>
             </div>
@@ -490,10 +540,35 @@ function App() {
             result={result}
             previewUrl={previewUrl}
             fileName={file.name}
-            initialRotation={repeatRecord?.rotationDegrees ?? 0}
             onFinalDecision={completeQueueCase}
-            onPause={isRepeatReview ? returnToCompletedReviews : pauseQueue}
+            onPause={pauseQueue}
           />
+        )}
+
+        {amendmentQueueSample && amendmentRecord?.result && amendmentCheckId && (
+          <>
+            <div className="results-page-heading queue-review-heading amendment-heading">
+              <div>
+                <p className="eyebrow">Changing completed decision</p>
+                <h1>{amendmentQueueSample.name}</h1>
+                <p>Update the selected card. Previous staff answers remain locked, while unanswered cards remain available if they are needed for a final Pass.</p>
+              </div>
+            </div>
+            {previewUrl && file ? (
+              <ReviewResults
+                result={amendmentRecord.result}
+                previewUrl={previewUrl}
+                fileName={file.name}
+                initialDecisions={amendmentRecord.staffDecisions}
+                initialRotation={amendmentRecord.rotationDegrees}
+                recordedDecision={amendmentRecord.finalDecision}
+                amendmentCheckId={amendmentCheckId}
+                onFinalDecision={completeQueueCase}
+                onPause={exitDecisionChange}
+                pauseLabel="Exit decision change"
+              />
+            ) : <div className="progress-panel"><strong>Loading saved label artwork…</strong></div>}
+          </>
         )}
 
         {route === '/results' && result && previewUrl && file && (
