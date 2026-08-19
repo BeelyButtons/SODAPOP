@@ -14,6 +14,8 @@ type Props = {
   result: ReviewOutcome
   previewUrl: string
   fileName: string
+  queueMode?: boolean
+  onFinalDecision?: (decision: StaffDecision) => void
 }
 
 function CheckCard({
@@ -92,11 +94,12 @@ function CheckCard({
   )
 }
 
-export function ReviewResults({ result, previewUrl, fileName }: Props) {
+export function ReviewResults({ result, previewUrl, fileName, queueMode = false, onFinalDecision }: Props) {
   const [previewedCheck, setPreviewedCheck] = useState<ReviewCheck['id'] | null>(null)
   const [selectedCheck, setSelectedCheck] = useState<ReviewCheck['id'] | null>(null)
   const [staffDecisions, setStaffDecisions] = useState<StaffDecisions>({})
   const [submitted, setSubmitted] = useState(false)
+  const [pendingFail, setPendingFail] = useState<ReviewCheck['id'] | null>(null)
   const passed = result.checks.filter((check) => check.status === 'pass').length
   const mismatches = result.checks.filter((check) => check.status === 'mismatch').length
   const reviews = result.checks.filter((check) => check.status === 'needs_review').length
@@ -113,19 +116,34 @@ export function ReviewResults({ result, previewUrl, fileName }: Props) {
         : 'Human review area'
   const decidedCount = result.checks.filter((check) => staffDecisions[check.id]).length
   const allDecided = decidedCount === result.checks.length
-  const finalDecision = allDecided
-    ? result.checks.some((check) => staffDecisions[check.id] === 'fail')
-      ? 'fail'
-      : 'pass'
-    : null
+  const hasStaffFailure = result.checks.some((check) => staffDecisions[check.id] === 'fail')
+  const finalDecision = hasStaffFailure ? 'fail' : allDecided ? 'pass' : null
 
   function selectCheck(id: ReviewCheck['id']) {
     setSelectedCheck((current) => (current === id ? null : id))
   }
 
   function recordDecision(id: ReviewCheck['id'], decision: StaffDecision) {
+    if (decision === 'fail') {
+      setPendingFail(id)
+      return
+    }
     setStaffDecisions((current) => ({ ...current, [id]: decision }))
     setSubmitted(false)
+  }
+
+  function confirmQuickFail() {
+    if (!pendingFail) return
+    setStaffDecisions((current) => ({ ...current, [pendingFail]: 'fail' }))
+    setPendingFail(null)
+    setSubmitted(true)
+    onFinalDecision?.('fail')
+  }
+
+  function submitFinalDecision() {
+    if (!finalDecision) return
+    setSubmitted(true)
+    onFinalDecision?.(finalDecision)
   }
 
   return (
@@ -238,14 +256,14 @@ export function ReviewResults({ result, previewUrl, fileName }: Props) {
             <p className="eyebrow">Final staff decision</p>
             <h2 id="final-decision-title">
               {!finalDecision
-                ? 'Complete every item to determine the result'
+                ? 'Mark every item Pass, or use Fail to end this review'
                 : finalDecision === 'pass'
                   ? 'Final determination: Pass'
                   : 'Final determination: Fail'}
             </h2>
             <p>
               {!finalDecision
-                ? `${result.checks.length - decidedCount} item${result.checks.length - decidedCount === 1 ? '' : 's'} still require a staff determination.`
+                ? `${result.checks.length - decidedCount} item${result.checks.length - decidedCount === 1 ? ' remains' : 's remain'}. A confirmed failure ends the review immediately.`
                 : finalDecision === 'pass'
                   ? 'All reviewed items are marked Pass.'
                   : 'At least one reviewed item is marked Fail, so the label cannot pass.'}
@@ -256,9 +274,9 @@ export function ReviewResults({ result, previewUrl, fileName }: Props) {
           className="primary-button final-submit-button"
           type="button"
           disabled={!allDecided || submitted}
-          onClick={() => setSubmitted(true)}
+          onClick={submitFinalDecision}
         >
-          {submitted ? 'Final decision submitted' : 'Submit final decision'}
+          {submitted ? 'Final decision submitted' : queueMode ? 'Submit Pass decision' : 'Submit final decision'}
           {!submitted && <span aria-hidden="true">→</span>}
         </button>
         {submitted && (
@@ -267,6 +285,27 @@ export function ReviewResults({ result, previewUrl, fileName }: Props) {
           </p>
         )}
       </section>
+
+      {pendingFail && (
+        <div className="quick-fail-backdrop" role="presentation">
+          <section className="quick-fail-dialog" role="alertdialog" aria-modal="true" aria-labelledby="quick-fail-title">
+            <span className="quick-fail-icon" aria-hidden="true">!</span>
+            <p className="eyebrow">Quick fail</p>
+            <h2 id="quick-fail-title">Confirm this label has failed?</h2>
+            <p>
+              You found a non-compliant item. Confirming records a final Fail without requiring answers for the remaining checks.
+            </p>
+            <div>
+              <button className="secondary-button" type="button" onClick={() => setPendingFail(null)}>
+                Go back to review
+              </button>
+              <button className="confirm-fail-button" type="button" onClick={confirmQuickFail} autoFocus>
+                Confirm failure
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </section>
   )
 }

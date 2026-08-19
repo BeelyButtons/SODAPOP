@@ -7,6 +7,8 @@ SODAPOP — System for Optical Detection, Analysis & Packaging-Oversight Process
 ## Current status
 
 - Single-label review: working
+- Resumable demonstration review queue: working
+- Quick-fail confirmation and automatic move to the next label: working
 - Staff Pass/Fail determination for every reviewed item: working
 - Final decision rule and submission control: working
 - Synthetic compliant, failure, varied-layout, and difficult-photo cases: included
@@ -14,27 +16,32 @@ SODAPOP — System for Optical Detection, Analysis & Packaging-Oversight Process
 - Coordinate-backed label highlighting: working
 - Angled-label deskewing and orientation-aware highlights: working
 - Conditional glare and alternate-orientation OCR retries: working
-- URL-aware SPA views (`/review` and `/results`): working
-- Automated verification: 28 tests, GitHub Pages production build, and lint checks passing
+- URL-aware SPA views for the queue, individual cases, new-label intake, and results: working
+- Automated verification: 33 tests, GitHub Pages production build, and lint checks passing
 - Batch review: planned after the single-label workflow is validated
 - Live URL: [https://beelybuttons.github.io/SODAPOP/](https://beelybuttons.github.io/SODAPOP/)
 
 ## What it does
 
-1. Accepts selected application values and a JPEG, PNG, or WebP label image.
-2. Preprocesses the image and runs Tesseract LSTM OCR entirely in the browser.
-3. Compares brand name, class/type, alcohol content, and net contents.
-4. Checks the government warning’s exact wording and required uppercase heading.
-5. Reports automated `Pass`, `Mismatch`, or `Human review` findings with expected and observed evidence.
-6. Highlights detected label text in green for a match, red for a confirmed issue, or amber for human review.
-7. Requires staff to mark every investigated item `Pass` or `Fail` after examining the evidence.
-8. Determines the final result: every item must be marked `Pass`; one or more `Fail` decisions produce a final `Fail`.
-9. Enables `Submit final decision` only after every item has a staff determination.
-10. Measures processing time against the five-second usability target.
+1. Presents all nine demonstration labels in a staff review queue with remaining and completed counts.
+2. Starts with the first unfinished label, supports pausing, and resumes from browser-local progress.
+3. Also accepts selected application values and a JPEG, PNG, or WebP label image for an independent review.
+4. Preprocesses the image and runs Tesseract LSTM OCR entirely in the browser.
+5. Compares brand name, class/type, alcohol content, and net contents.
+6. Checks the government warning’s exact wording and required uppercase heading.
+7. Reports automated `Pass`, `Mismatch`, or `Human review` findings with expected and observed evidence.
+8. Highlights detected label text in green for a match, red for a confirmed issue, or amber for human review.
+9. Requires staff to mark every investigated item `Pass` or `Fail` after examining the evidence.
+10. Allows a reviewer to confirm a failure immediately after the first failed item instead of answering irrelevant remaining questions.
+11. Determines the final result: every item must be marked `Pass`; one confirmed `Fail` decision ends the review as a final `Fail`.
+12. Moves to the next queued label after the final decision and returns to an empty queue when work is complete.
+13. Measures processing time against the five-second usability target.
 
 The application uses meaningful browser routes even though it remains a client-side SPA:
 
-- `/SODAPOP/review` — application values and label intake
+- `/SODAPOP/review` — review portal and demonstration queue
+- `/SODAPOP/review/:case-id` — an individual queued-label review
+- `/SODAPOP/review/new` — application values and independent label intake
 - `/SODAPOP/results` — automated evidence, staff determinations, and final decision
 
 GitHub Pages receives a `404.html` copy of the SPA entry point so direct links and browser refreshes can return to the appropriate client-side route. Results are intentionally session-only; directly opening `/results` without an active review returns the user to `/review`.
@@ -45,7 +52,18 @@ The included synthetic cases demonstrate a matching label, incorrect ABV, incorr
 
 The workflow is being improved through repeated hands-on review by the project owner in collaboration with Codex. The project owner has driven the practical improvements: simplifying the opening experience, moving privacy information out of the way, making the label easier to inspect, identifying misleading sample-label behavior, requesting status-aware highlights, broadening the test-label designs, and requiring an explicit staff decision instead of treating automation as approval.
 
-That iterative review materially changed the product from a basic OCR comparison demo into a staff-centered decision-support workflow. Each improvement is evaluated against a simple principle: automation should help staff locate and understand evidence, while staff retain responsibility for the regulatory determination.
+That iterative review materially changed the product from a basic OCR comparison demo into a staff-centered decision-support workflow. The project owner's latest review introduced the portal, persistent queue, sequential review experience, accessible evidence hierarchy, and quick-fail path. Each improvement is evaluated against a simple principle: automation should help staff locate and understand evidence, while staff retain responsibility for the regulatory determination.
+
+### Review queue and accessibility improvements
+
+- Every synthetic case is now visible in `Labels to Review`, including its purpose and staff disposition.
+- `Start / Restart label reviews` opens the first unfinished case; `Pause review` returns to the queue without discarding completed decisions.
+- Each case has a meaningful browser URL, and the original independent upload form remains available under `New label`.
+- Queue progress is stored only in the current browser and can be reset from the portal.
+- Application requirements are larger and visually stronger than OCR observations, reflecting what staff must compare the artwork against.
+- Controls and evidence text are larger and higher contrast for reviewers who need more readable interfaces.
+- Pass and Fail controls use light semantic colors before selection and stronger colors after selection.
+- A Fail selection requires explicit confirmation, then records the label failure without forcing the reviewer through the remaining cards.
 
 ### Recent OCR reliability improvements
 
@@ -79,7 +97,7 @@ Application values → validation → deterministic comparison rules → review 
 - **Tesseract.js:** zero-cost local OCR with no external ML endpoint at review time.
 - **Deterministic verification:** exact and numeric regulatory checks do not depend on generative-model judgment.
 - **Quality-gated retries:** extra OCR work is performed only when expected label evidence remains incomplete.
-- **No database or accounts:** the prototype has no persistence requirement and does not need to collect identity data.
+- **No database or accounts:** only demonstration-queue decisions are persisted in browser storage; images and extracted label content remain in memory.
 - **Static deployment:** the current slice can run on GitHub Pages without a paid backend.
 
 The OCR worker, WebAssembly runtime, and English language model are served from the application’s own origin. A restricted client network does not need access to third-party OCR or CDN domains.
@@ -116,7 +134,8 @@ This prototype minimizes its data boundary instead of claiming production federa
 - Images are processed locally in browser memory.
 - No image, OCR text, application value, or user identity is uploaded or retained.
 - No database, cookies, analytics, or user accounts are used.
-- Staff determinations and the submitted final decision exist only in the current browser session; they are not transmitted or retained.
+- Demonstration-queue Pass/Fail progress is saved in local browser storage so a reviewer can pause and restart. It can be cleared with `Reset review queue` and is never transmitted.
+- Independent uploaded-label decisions remain session-only.
 - Files are limited to 10 MB and validated by size, declared MIME type, and binary signature.
 - Only JPEG, PNG, and WebP inputs are accepted; SVG and executable formats are rejected.
 - Repository and deployment workflows contain no credentials.
@@ -183,9 +202,9 @@ The current implementation has no application runtime fee: all processing is loc
 
 ## Next increment
 
-1. Expand browser-level OCR regression benchmarks for angled, glare, dark, and upside-down fixtures.
+1. Validate the new queue, pause/restart behavior, readability, and quick-fail experience with staff reviewers.
 2. Continue the single-label rule sequence with deeper brand name, alcohol content, net contents, and additional checks.
-3. Validate the staff confirmation and final-decision workflow with single-label reviewers.
+3. Expand browser-level OCR regression benchmarks for angled, glare, dark, and upside-down fixtures.
 4. Add CSV plus multiple-image batch intake with deterministic image-to-row matching.
 5. Process a limited number of labels concurrently and preserve per-item failures and staff decisions.
 6. Export a review summary and add wine and malt-beverage rule modules if appropriate.

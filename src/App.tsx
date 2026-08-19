@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState, type ChangeEvent, type DragEvent, type FormEvent, type MouseEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent, type FormEvent, type MouseEvent } from 'react'
 import './App.css'
 import { ApplicationForm } from './components/ApplicationForm'
 import { ReviewResults } from './components/ReviewResults'
+import { ReviewPortal } from './components/ReviewPortal'
 import { UploadPanel } from './components/UploadPanel'
 import { SAMPLE_LABELS, createSampleFile } from './data/sampleLabels'
 import {
@@ -14,6 +15,16 @@ import {
 import { verifyLabel } from './domain/verifyLabel'
 import { recognizeLabel, type OcrProgress } from './ocr/recognizeLabel'
 import { appUrl, useAppRoute, type AppRoute } from './routing'
+import {
+  clearQueueProgress,
+  nextRemainingSample,
+  queueIdFromRoute,
+  queueSample,
+  readQueueProgress,
+  saveQueueProgress,
+  type QueueDecision,
+  type QueueProgress,
+} from './reviewQueue'
 
 type FormErrors = Partial<Record<keyof ApplicationData | 'file' | 'form', string>>
 
@@ -25,6 +36,10 @@ function App() {
   const [progress, setProgress] = useState<OcrProgress | null>(null)
   const [result, setResult] = useState<ReviewOutcome | null>(null)
   const [loadingSample, setLoadingSample] = useState<string | null>(null)
+  const [queueProgress, setQueueProgress] = useState<QueueProgress>(readQueueProgress)
+  const processingQueueCase = useRef<string | null>(null)
+  const activeQueueId = queueIdFromRoute(route)
+  const activeQueueSample = queueSample(activeQueueId)
 
   const previewUrl = useMemo(() => (file ? URL.createObjectURL(file) : null), [file])
   useEffect(() => {
@@ -35,8 +50,61 @@ function App() {
 
   useEffect(() => {
     if (route === '/results' && !result) navigate('/review', true)
-    document.title = route === '/results' ? 'Review results · SODAPOP' : 'Review a label · SODAPOP'
-  }, [navigate, result, route])
+    if (activeQueueId && !activeQueueSample) navigate('/review', true)
+    document.title = route === '/review'
+      ? 'Review portal · SODAPOP'
+      : route === '/review/new'
+        ? 'New label review · SODAPOP'
+        : 'Review results · SODAPOP'
+  }, [activeQueueId, activeQueueSample, navigate, result, route])
+
+  useEffect(() => {
+    if (!activeQueueSample || result || processingQueueCase.current === activeQueueSample.id) return
+    const sample = activeQueueSample
+    processingQueueCase.current = sample.id
+    let cancelled = false
+
+    async function processQueueCase() {
+      setLoadingSample(sample.id)
+      setErrors({})
+      setProgress({ progress: 1, message: 'Preparing queued label' })
+      try {
+        const sampleFile = await createSampleFile(sample.id)
+        if (cancelled) return
+        setApplication({ ...sample.application })
+        setFile(sampleFile)
+        const ocr = await recognizeLabel(sampleFile, sample.application, setProgress)
+        if (cancelled) return
+        setResult(verifyLabel({
+          application: sample.application,
+          ocrText: ocr.text,
+          ocrConfidence: ocr.confidence,
+          durationMs: ocr.durationMs,
+          ocrWords: ocr.words,
+          imageWidth: ocr.imageWidth,
+          imageHeight: ocr.imageHeight,
+          ocrAttempts: ocr.attempts,
+          ocrRotationDegrees: (ocr.rotationRadians * 180) / Math.PI,
+        }))
+      } catch (error) {
+        if (!cancelled) {
+          setErrors({ form: error instanceof Error ? error.message : 'The queued label could not be processed.' })
+        }
+      } finally {
+        if (!cancelled) {
+          setProgress(null)
+          setLoadingSample(null)
+          processingQueueCase.current = null
+        }
+      }
+    }
+
+    void processQueueCase()
+    return () => {
+      cancelled = true
+      if (processingQueueCase.current === sample.id) processingQueueCase.current = null
+    }
+  }, [activeQueueSample, result])
 
   function routeLink(event: MouseEvent<HTMLAnchorElement>, nextRoute: AppRoute) {
     event.preventDefault()
@@ -139,6 +207,43 @@ function App() {
     }
   }
 
+  function openQueueCase(id: (typeof SAMPLE_LABELS)[number]['id']) {
+    setResult(null)
+    setFile(null)
+    setErrors({})
+    navigate(`/review/${id}`)
+  }
+
+  function startQueue() {
+    const next = nextRemainingSample(queueProgress)
+    if (next) openQueueCase(next.id)
+  }
+
+  function resetQueue() {
+    clearQueueProgress()
+    setQueueProgress({})
+  }
+
+  function completeQueueCase(decision: QueueDecision) {
+    if (!activeQueueSample) return
+    const updated = { ...queueProgress, [activeQueueSample.id]: decision }
+    saveQueueProgress(updated)
+    setQueueProgress(updated)
+    const next = nextRemainingSample(updated, activeQueueSample.id)
+    setResult(null)
+    setFile(null)
+    if (next) navigate(`/review/${next.id}`)
+    else navigate('/review')
+  }
+
+  function pauseQueue() {
+    processingQueueCase.current = null
+    setProgress(null)
+    setResult(null)
+    setFile(null)
+    navigate('/review')
+  }
+
   return (
     <div className="app-shell">
       <header className="site-header">
@@ -157,9 +262,16 @@ function App() {
             href={appUrl('/review')}
             onClick={(event) => routeLink(event, '/review')}
           >
-            Review
+            Review queue
           </a>
-          {result && (
+          <a
+            className={route === '/review/new' ? 'active' : ''}
+            href={appUrl('/review/new')}
+            onClick={(event) => routeLink(event, '/review/new')}
+          >
+            New label
+          </a>
+          {result && !activeQueueSample && (
             <a
               className={route === '/results' ? 'active' : ''}
               href={appUrl('/results')}
@@ -173,15 +285,11 @@ function App() {
       </header>
 
       <main id="top">
-        {route === '/review' && <section className="hero-section" aria-labelledby="page-title">
-          <p className="eyebrow">AI-assisted alcohol label verification</p>
-          <h1 id="page-title">SODAPOP</h1>
-          <p className="product-name">
-            System for Optical Detection, Analysis &amp; Packaging-Oversight Processing
-          </p>
-        </section>}
+        {route === '/review' && (
+          <ReviewPortal progress={queueProgress} onStart={startQueue} onSelect={openQueueCase} onReset={resetQueue} />
+        )}
 
-        {route === '/review' && <section className="workspace" aria-label="Single-label review workspace">
+        {route === '/review/new' && <section className="workspace workspace-new" aria-label="Single-label review workspace">
           <div className="workspace-heading">
             <div>
               <span className="step-number">1</span>
@@ -238,6 +346,39 @@ function App() {
           </form>
         </section>}
 
+        {activeQueueSample && (
+          <div className="results-page-heading queue-review-heading">
+            <div>
+              <p className="eyebrow">Queued label review</p>
+              <h1>{activeQueueSample.name}</h1>
+              <p>{activeQueueSample.description}</p>
+            </div>
+            <button className="secondary-button" type="button" onClick={pauseQueue}>
+              Pause review
+            </button>
+          </div>
+        )}
+
+        {activeQueueSample && progress && (
+          <div className="progress-panel queue-progress" role="status" aria-live="polite">
+            <div><strong>{progress.message}</strong><span>{progress.progress}%</span></div>
+            <progress value={progress.progress} max="100" />
+            <p>SODAPOP is processing this label locally.</p>
+          </div>
+        )}
+
+        {activeQueueSample && errors.form && <div className="form-alert" role="alert">{errors.form}</div>}
+
+        {activeQueueSample && result && previewUrl && file && (
+          <ReviewResults
+            result={result}
+            previewUrl={previewUrl}
+            fileName={file.name}
+            queueMode
+            onFinalDecision={completeQueueCase}
+          />
+        )}
+
         {route === '/results' && result && previewUrl && file && (
           <>
             <div className="results-page-heading">
@@ -245,7 +386,7 @@ function App() {
                 <p className="eyebrow">Single-label review</p>
                 <h1>Review results</h1>
               </div>
-              <button className="secondary-button" type="button" onClick={() => navigate('/review')}>
+              <button className="secondary-button" type="button" onClick={() => navigate('/review/new')}>
                 ← Back to application
               </button>
             </div>
@@ -268,7 +409,7 @@ function App() {
             <span className="privacy-icon" aria-hidden="true">✓</span>
             <div>
               <h2 id="privacy-title">Private by design</h2>
-              <p>Images stay in this browser. No uploads, accounts, or stored review data.</p>
+              <p>Images are never uploaded. Demonstration-queue progress is saved only in this browser and can be reset.</p>
             </div>
           </section>
         </div>
@@ -276,7 +417,7 @@ function App() {
 
       <footer>
         <span>SODAPOP prototype</span>
-        <span>Local processing · No data retention</span>
+        <span>Local processing · Browser-only queue progress</span>
       </footer>
     </div>
   )

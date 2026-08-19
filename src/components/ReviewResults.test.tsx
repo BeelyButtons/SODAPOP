@@ -146,13 +146,17 @@ describe('ReviewResults', () => {
   it('makes the final determination fail when any item is marked fail', async () => {
     const user = userEvent.setup()
     render(<ReviewResults result={result} previewUrl="label.png" fileName="label.png" />)
-    const passButtons = screen.getAllByRole('button', { name: 'Pass' })
     const failButtons = screen.getAllByRole('button', { name: 'Fail' })
 
     await user.click(failButtons[0])
-    for (const button of passButtons.slice(1)) await user.click(button)
+    expect(screen.getByRole('alertdialog', { name: /Confirm this label has failed/i })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /Go back to review/i }))
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+
+    await user.click(failButtons[0])
+    await user.click(screen.getByRole('button', { name: /Confirm failure/i }))
 
     expect(screen.getByRole('heading', { name: 'Final determination: Fail' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Submit final decision/i })).toBeEnabled()
+    expect(screen.getByRole('button', { name: /Final decision submitted/i })).toBeDisabled()
   })
 })
