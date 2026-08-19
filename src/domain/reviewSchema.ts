@@ -37,12 +37,14 @@ export type OcrBox = {
   y0: number
   x1: number
   y1: number
+  points?: Array<{ x: number; y: number }>
 }
 
 export type OcrWord = {
   text: string
   confidence: number
   bbox: OcrBox
+  lineId?: string
   fontName?: string
   inkRatio?: number
 }
@@ -69,6 +71,8 @@ export type ReviewOutcome = {
   ocrText: string
   ocrConfidence: number
   durationMs: number
+  ocrAttempts?: number
+  ocrRotationDegrees?: number
 }
 
 export const imageFileSchema = z

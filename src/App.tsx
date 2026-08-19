@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ChangeEvent, type DragEvent, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type ChangeEvent, type DragEvent, type FormEvent, type MouseEvent } from 'react'
 import './App.css'
 import { ApplicationForm } from './components/ApplicationForm'
 import { ReviewResults } from './components/ReviewResults'
@@ -13,10 +13,12 @@ import {
 } from './domain/reviewSchema'
 import { verifyLabel } from './domain/verifyLabel'
 import { recognizeLabel, type OcrProgress } from './ocr/recognizeLabel'
+import { appUrl, useAppRoute, type AppRoute } from './routing'
 
 type FormErrors = Partial<Record<keyof ApplicationData | 'file' | 'form', string>>
 
 function App() {
+  const { route, navigate } = useAppRoute()
   const [application, setApplication] = useState<ApplicationData>(INITIAL_APPLICATION)
   const [file, setFile] = useState<File | null>(null)
   const [errors, setErrors] = useState<FormErrors>({})
@@ -30,6 +32,16 @@ function App() {
       if (previewUrl) URL.revokeObjectURL(previewUrl)
     }
   }, [previewUrl])
+
+  useEffect(() => {
+    if (route === '/results' && !result) navigate('/review', true)
+    document.title = route === '/results' ? 'Review results · SODAPOP' : 'Review a label · SODAPOP'
+  }, [navigate, result, route])
+
+  function routeLink(event: MouseEvent<HTMLAnchorElement>, nextRoute: AppRoute) {
+    event.preventDefault()
+    navigate(nextRoute)
+  }
 
   function updateField<Key extends keyof ApplicationData>(key: Key, value: ApplicationData[Key]) {
     setApplication((current) => ({ ...current, [key]: value }))
@@ -101,9 +113,8 @@ function App() {
     setResult(null)
     setProgress({ progress: 1, message: 'Starting local review' })
     try {
-      const ocr = await recognizeLabel(parsedFile.data, setProgress)
-      setResult(
-        verifyLabel({
+      const ocr = await recognizeLabel(parsedFile.data, parsedApplication.data, setProgress)
+      const nextResult = verifyLabel({
           application: parsedApplication.data,
           ocrText: ocr.text,
           ocrConfidence: ocr.confidence,
@@ -111,8 +122,11 @@ function App() {
           ocrWords: ocr.words,
           imageWidth: ocr.imageWidth,
           imageHeight: ocr.imageHeight,
-        }),
-      )
+          ocrAttempts: ocr.attempts,
+          ocrRotationDegrees: (ocr.rotationRadians * 180) / Math.PI,
+        })
+      setResult(nextResult)
+      navigate('/results')
     } catch (error) {
       setErrors({
         form:
@@ -128,23 +142,46 @@ function App() {
   return (
     <div className="app-shell">
       <header className="site-header">
-        <a className="wordmark" href="#top" aria-label="SODAPOP home">
+        <a
+          className="wordmark"
+          href={appUrl('/review')}
+          aria-label="SODAPOP review page"
+          onClick={(event) => routeLink(event, '/review')}
+        >
           <span className="wordmark-mark" aria-hidden="true">SP</span>
           <span>SODAPOP</span>
         </a>
-        <span className="prototype-badge">Prototype · Distilled spirits</span>
+        <nav className="site-nav" aria-label="Primary navigation">
+          <a
+            className={route === '/review' ? 'active' : ''}
+            href={appUrl('/review')}
+            onClick={(event) => routeLink(event, '/review')}
+          >
+            Review
+          </a>
+          {result && (
+            <a
+              className={route === '/results' ? 'active' : ''}
+              href={appUrl('/results')}
+              onClick={(event) => routeLink(event, '/results')}
+            >
+              Results
+            </a>
+          )}
+          <span className="prototype-badge">Prototype · Distilled spirits</span>
+        </nav>
       </header>
 
       <main id="top">
-        <section className="hero-section" aria-labelledby="page-title">
+        {route === '/review' && <section className="hero-section" aria-labelledby="page-title">
           <p className="eyebrow">AI-assisted alcohol label verification</p>
           <h1 id="page-title">SODAPOP</h1>
           <p className="product-name">
             System for Optical Detection, Analysis &amp; Packaging-Oversight Processing
           </p>
-        </section>
+        </section>}
 
-        <section className="workspace" aria-label="Single-label review workspace">
+        {route === '/review' && <section className="workspace" aria-label="Single-label review workspace">
           <div className="workspace-heading">
             <div>
               <span className="step-number">1</span>
@@ -199,10 +236,21 @@ function App() {
               </div>
             )}
           </form>
-        </section>
+        </section>}
 
-        {result && previewUrl && file && (
-          <ReviewResults result={result} previewUrl={previewUrl} fileName={file.name} />
+        {route === '/results' && result && previewUrl && file && (
+          <>
+            <div className="results-page-heading">
+              <div>
+                <p className="eyebrow">Single-label review</p>
+                <h1>Review results</h1>
+              </div>
+              <button className="secondary-button" type="button" onClick={() => navigate('/review')}>
+                ← Back to application
+              </button>
+            </div>
+            <ReviewResults result={result} previewUrl={previewUrl} fileName={file.name} />
+          </>
         )}
 
         <div className="trust-notes">

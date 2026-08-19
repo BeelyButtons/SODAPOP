@@ -12,7 +12,10 @@ SODAPOP — System for Optical Detection, Analysis & Packaging-Oversight Process
 - Synthetic compliant, failure, varied-layout, and difficult-photo cases: included
 - Local OCR benchmark: 0.6–1.1 seconds on the included 1400×1900 samples after local testing
 - Coordinate-backed label highlighting: working
-- Automated verification: 23 tests, production build, and lint checks passing
+- Angled-label deskewing and orientation-aware highlights: working
+- Conditional glare and alternate-orientation OCR retries: working
+- URL-aware SPA views (`/review` and `/results`): working
+- Automated verification: 28 tests, GitHub Pages production build, and lint checks passing
 - Batch review: planned after the single-label workflow is validated
 - Live URL: [https://beelybuttons.github.io/SODAPOP/](https://beelybuttons.github.io/SODAPOP/)
 
@@ -29,6 +32,13 @@ SODAPOP — System for Optical Detection, Analysis & Packaging-Oversight Process
 9. Enables `Submit final decision` only after every item has a staff determination.
 10. Measures processing time against the five-second usability target.
 
+The application uses meaningful browser routes even though it remains a client-side SPA:
+
+- `/SODAPOP/review` — application values and label intake
+- `/SODAPOP/results` — automated evidence, staff determinations, and final decision
+
+GitHub Pages receives a `404.html` copy of the SPA entry point so direct links and browser refreshes can return to the appropriate client-side route. Results are intentionally session-only; directly opening `/results` without an active review returns the user to `/review`.
+
 The included synthetic cases demonstrate a matching label, incorrect ABV, incorrect warning capitalization, improperly bold warning body text, a missing warning, varied label layouts, reverse light-on-dark type, an angled tabletop photograph, and glare/low contrast.
 
 ## Product direction and iterative improvement
@@ -37,10 +47,29 @@ The workflow is being improved through repeated hands-on review by the project o
 
 That iterative review materially changed the product from a basic OCR comparison demo into a staff-centered decision-support workflow. Each improvement is evaluated against a simple principle: automation should help staff locate and understand evidence, while staff retain responsibility for the regulatory determination.
 
+### Recent OCR reliability improvements
+
+Hands-on review of the angled Ember & Ash and glare-affected Harbor Light examples exposed failures that clean synthetic artwork did not. The resulting improvements are deliberate rather than cosmetic:
+
+- Small label images are upscaled before recognition so regulatory text receives enough pixels.
+- Tesseract automatic rotation is enabled for ordinary skewed photographs.
+- When expected evidence remains weak, SODAPOP conditionally retries with local adaptive thresholding designed for uneven lighting and glare.
+- Difficult orientations are retried at 180°, 90°, and -90° only when earlier passes do not meet the quality gate.
+- The best OCR attempt is selected using expected application fields and warning evidence, not overall OCR confidence alone.
+- Field matching retains OCR line geometry so nearby values such as `750 mL` are less likely to be absorbed into class/type.
+- Meaningful brand punctuation, including `&`, is preserved instead of being silently normalized away.
+- OCR boxes are transformed back onto the original photograph and rendered as polygons, allowing highlights to follow angled words.
+- A warning that OCR cannot confidently locate is sent to staff review rather than automatically treated as a confirmed mismatch. A detected substitute statement or conflicting wording can still produce a mismatch.
+
+These changes use the existing performance budget intelligently: clean images keep the fast path, while difficult images receive extra processing instead of an artificial delay.
+
 ## Why this architecture
 
 ```text
-Label image → local preprocessing → local OCR → structured extraction
+Label image → upscale/contrast → orientation-aware OCR → quality gate
+                              ↘ conditional enhanced/rotated retries ↗
+                                                     ↓
+                                           structured extraction
                                                      ↓
 Application values → validation → deterministic comparison rules → review evidence
 ```
@@ -49,6 +78,7 @@ Application values → validation → deterministic comparison rules → review 
 - **Zod:** one validation contract for application and file metadata.
 - **Tesseract.js:** zero-cost local OCR with no external ML endpoint at review time.
 - **Deterministic verification:** exact and numeric regulatory checks do not depend on generative-model judgment.
+- **Quality-gated retries:** extra OCR work is performed only when expected label evidence remains incomplete.
 - **No database or accounts:** the prototype has no persistence requirement and does not need to collect identity data.
 - **Static deployment:** the current slice can run on GitHub Pages without a paid backend.
 
@@ -131,6 +161,7 @@ src/
   data/             Synthetic label fixtures
   domain/           Schemas, normalization, and verification rules
   ocr/              Local OCR initialization and preprocessing
+  routing.ts        Browser-history routes that respect the deployed base path
   test/             Shared test setup
 public/ocr/          Same-origin OCR worker, runtime, and language assets
 .github/workflows/  CI and GitHub Pages deployment
@@ -140,7 +171,7 @@ public/ocr/          Same-origin OCR worker, runtime, and language assets
 
 - The initial scope is distilled spirits; wine and malt-beverage rules are not implemented.
 - This prototype uses manual application entry. Batch CSV input comes next.
-- OCR accuracy depends on image quality. Included glare, perspective, varied-layout, and reverse-type fixtures expose these limitations for staff evaluation.
+- OCR accuracy still depends on image quality. Included glare, perspective, upside-down, varied-layout, and reverse-type fixtures expose these limitations for staff evaluation and regression testing.
 - The five-second result is a development-machine measurement on synthetic fixtures, not a service-level guarantee.
 - Physical font measurements cannot be conclusively derived from ordinary photographs.
 - Fuzzy matching assists triage but never overrides an exact regulatory rule.
@@ -152,9 +183,9 @@ The current implementation has no application runtime fee: all processing is loc
 
 ## Next increment
 
-1. Validate the staff confirmation and final-decision workflow with single-label reviewers.
-2. Continue the single-label rule sequence with brand name, alcohol content, net contents, and additional checks.
-3. Add CSV plus multiple-image batch intake with deterministic image-to-row matching.
-4. Process a limited number of labels concurrently and preserve per-item failures and staff decisions.
-5. Export a review summary.
-6. Expand photo-quality benchmarks and add wine and malt-beverage rule modules if appropriate.
+1. Expand browser-level OCR regression benchmarks for angled, glare, dark, and upside-down fixtures.
+2. Continue the single-label rule sequence with deeper brand name, alcohol content, net contents, and additional checks.
+3. Validate the staff confirmation and final-decision workflow with single-label reviewers.
+4. Add CSV plus multiple-image batch intake with deterministic image-to-row matching.
+5. Process a limited number of labels concurrently and preserve per-item failures and staff decisions.
+6. Export a review summary and add wine and malt-beverage rule modules if appropriate.

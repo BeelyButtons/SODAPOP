@@ -12,6 +12,7 @@ import {
   collapseWhitespace,
   findAlcohol,
   findVolume,
+  normalizeFieldText,
   normalizeWords,
   parseAlcohol,
   parseVolume,
@@ -26,6 +27,8 @@ type VerificationInput = {
   ocrWords?: OcrWord[]
   imageWidth?: number
   imageHeight?: number
+  ocrAttempts?: number
+  ocrRotationDegrees?: number
 }
 
 function normalizedToken(value: string) {
@@ -62,6 +65,7 @@ export function findImproperlyBoldWarningBody(
   imageHeight: number,
 ) {
   const warningWords = governmentWarningWords(words)
+  if (warningWords.some((word) => word.bbox.points?.length)) return undefined
   const firstBodyWord = warningWords[2]
   if (!firstBodyWord || !imageWidth || !imageHeight) return undefined
 
@@ -154,11 +158,37 @@ function textMatchCheck(
   label: string,
   expected: string,
   text: string,
+  words: OcrWord[],
 ): ReviewCheck {
-  const observed = bestObservedLine(expected, text)
+  const groupedLines = new Map<string, OcrWord[]>()
+  words.forEach((word, index) => {
+    const key = word.lineId ?? `unassigned-${index}`
+    groupedLines.set(key, [...(groupedLines.get(key) ?? []), word])
+  })
+  const targetLength = normalizeWords(expected).split(' ').length
+  const geometricCandidates = [...groupedLines.values()].flatMap((lineWords) => {
+    const candidates: string[] = []
+    for (let start = 0; start < lineWords.length; start += 1) {
+      for (let length = Math.max(1, targetLength - 2); length <= targetLength + 1; length += 1) {
+        if (start + length <= lineWords.length) {
+          candidates.push(lineWords.slice(start, start + length).map((word) => word.text).join(' '))
+        }
+      }
+    }
+    return candidates
+  })
+  const observed = geometricCandidates.reduce(
+    (best, candidate) => similarity(expected, candidate) > similarity(expected, best) ? candidate : best,
+    bestObservedLine(expected, text),
+  )
   const score = similarity(expected, observed)
-  const normalizedFound = normalizeWords(text).includes(normalizeWords(expected))
-  const status: CheckStatus = normalizedFound ? 'pass' : score >= 0.78 ? 'needs_review' : 'mismatch'
+  const punctuationMatches = !expected.includes('&') || text.includes('&')
+  const normalizedFound = normalizeFieldText(text).includes(normalizeFieldText(expected))
+  const status: CheckStatus = normalizedFound && punctuationMatches
+    ? 'pass'
+    : score >= 0.45
+      ? 'needs_review'
+      : 'mismatch'
 
   return {
     id,
@@ -168,7 +198,9 @@ function textMatchCheck(
     observed: observed || 'Not found',
     explanation:
       status === 'pass'
-        ? 'The label matches after harmless capitalization and punctuation normalization.'
+        ? 'The label matches after harmless capitalization and spacing normalization.'
+        : !punctuationMatches
+          ? 'The expected ampersand was not detected. Confirm the brand punctuation visually.'
         : status === 'needs_review'
           ? `A possible match was found (${Math.round(score * 100)}% text similarity). Confirm visually.`
           : 'No sufficiently similar label text was found.',
@@ -187,7 +219,19 @@ function alcoholCheck(expected: string, text: string): ReviewCheck {
   const proofMatches =
     !proofRequired ||
     (observedValues.proof !== null && Math.abs(expectedValues.proof! - observedValues.proof) < 0.01)
-  const status: CheckStatus = abvMatches && proofMatches ? 'pass' : observed ? 'mismatch' : 'needs_review'
+  const confirmedAbvMismatch =
+    expectedValues.abv !== null &&
+    observedValues.abv !== null &&
+    Math.abs(expectedValues.abv - observedValues.abv) >= 0.01
+  const confirmedProofMismatch =
+    expectedValues.proof !== null &&
+    observedValues.proof !== null &&
+    Math.abs(expectedValues.proof - observedValues.proof) >= 0.01
+  const status: CheckStatus = abvMatches && proofMatches
+    ? 'pass'
+    : confirmedAbvMismatch || confirmedProofMismatch
+      ? 'mismatch'
+      : 'needs_review'
 
   return {
     id: 'alcohol',
@@ -244,22 +288,30 @@ function warningChecks(
       : ''
   const wordingSimilarity = observed ? similarity(GOVERNMENT_WARNING, observed) : 0
 
-  let textStatus: CheckStatus = 'mismatch'
-  let textExplanation = 'The required warning statement was not found.'
+  let textStatus: CheckStatus = 'needs_review'
+  let textExplanation = 'The warning was not confidently detected. Confirm its presence and wording visually.'
   if (exactMatch) {
     textStatus = 'pass'
     textExplanation = 'The OCR text matches the required federal warning exactly.'
   } else if (caseInsensitiveMatch) {
+    textStatus = 'mismatch'
     textExplanation = 'The wording matches, but required capitalization does not.'
   } else if (wordingSimilarity >= 0.9) {
+    textStatus = 'mismatch'
     textExplanation = 'The warning is close but not exact. Exact wording is required.'
+  } else if (!observed && /please enjoy responsibly/i.test(collapsed)) {
+    textStatus = 'mismatch'
+    textExplanation = 'A responsibility statement was detected in place of the required federal warning.'
   } else if (!observed && confidence < 65) {
-    textStatus = 'needs_review'
     textExplanation = 'The warning was not detected and OCR confidence is low. Confirm visually.'
   }
 
   const uppercaseHeading = collapsed.includes('GOVERNMENT WARNING:')
-  const formatStatus: CheckStatus = uppercaseHeading && !improperBoldBody ? 'needs_review' : 'mismatch'
+  const formatStatus: CheckStatus = uppercaseHeading && !improperBoldBody
+    ? 'needs_review'
+    : improperBoldBody || textStatus === 'mismatch'
+      ? 'mismatch'
+      : 'needs_review'
   const minimumTypeSize = containerVolumeMl > 3000 ? 3 : containerVolumeMl > 237 ? 2 : 1
   const maximumCharactersPerInch = minimumTypeSize === 3 ? 12 : minimumTypeSize === 2 ? 25 : 40
 
@@ -287,7 +339,9 @@ function warningChecks(
         ? 'Only “GOVERNMENT WARNING” may be bold. The detected bold body text does not comply.'
         : uppercaseHeading
           ? 'No clear body-bolding problem was detected. Confirm heading weight, type size, contrast, and separation visually.'
-        : 'The heading must read “GOVERNMENT WARNING” in uppercase before visual formatting review.',
+        : textStatus === 'needs_review'
+          ? 'The heading was not confidently detected. Confirm the warning and its formatting visually.'
+          : 'The heading must read “GOVERNMENT WARNING” in uppercase before visual formatting review.',
       highlight: improperBoldBody?.region ?? highlight,
     },
   ]
@@ -303,12 +357,13 @@ export function verifyLabel(input: VerificationInput): ReviewOutcome {
     imageHeight,
   )
   const improperBoldBody = findImproperlyBoldWarningBody(words, imageWidth, imageHeight)
-  const brandCheck = textMatchCheck('brand', 'Brand name', input.application.brandName, input.ocrText)
+  const brandCheck = textMatchCheck('brand', 'Brand name', input.application.brandName, input.ocrText, words)
   const classTypeCheck = textMatchCheck(
     'classType',
     'Class / type',
     input.application.classType,
     input.ocrText,
+    words,
   )
   const detectedAlcoholCheck = alcoholCheck(input.application.alcoholContent, input.ocrText)
   const netContentsCheck = volumeCheck(input.application.netContents, input.ocrText)

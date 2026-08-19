@@ -151,6 +151,9 @@ export function ReviewResults({ result, previewUrl, fileName }: Props) {
             <strong>{(result.durationMs / 1000).toFixed(1)}s</strong>
             <span>{underTarget ? 'Within target' : 'Above 5s target'}</span>
           </div>
+          {result.ocrAttempts && result.ocrAttempts > 1 && (
+            <div><strong>{result.ocrAttempts}</strong><span>OCR passes</span></div>
+          )}
         </div>
       </div>
 
@@ -178,19 +181,30 @@ export function ReviewResults({ result, previewUrl, fileName }: Props) {
           </div>
           <div className="results-preview-frame" id="results-label-preview">
             <img src={previewUrl} alt="Alcohol label used for this review" />
-            {highlight?.boxes.map((box, index) => (
-              <span
-                className={`ocr-highlight-box highlight-${highlightStatus}`}
+            {highlight && (
+              <svg
+                className="ocr-highlight-layer"
+                viewBox={`0 0 ${highlight.imageWidth} ${highlight.imageHeight}`}
                 aria-hidden="true"
-                key={`${box.x0}-${box.y0}-${index}`}
-                style={{
-                  left: `${(box.x0 / highlight.imageWidth) * 100}%`,
-                  top: `${(box.y0 / highlight.imageHeight) * 100}%`,
-                  width: `${((box.x1 - box.x0) / highlight.imageWidth) * 100}%`,
-                  height: `${((box.y1 - box.y0) / highlight.imageHeight) * 100}%`,
-                }}
-              />
-            ))}
+                preserveAspectRatio="none"
+              >
+                {highlight.boxes.map((box, index) => {
+                  const points = box.points ?? [
+                    { x: box.x0, y: box.y0 },
+                    { x: box.x1, y: box.y0 },
+                    { x: box.x1, y: box.y1 },
+                    { x: box.x0, y: box.y1 },
+                  ]
+                  return (
+                    <polygon
+                      className={`ocr-highlight-box highlight-${highlightStatus}`}
+                      key={`${box.x0}-${box.y0}-${index}`}
+                      points={points.map((point) => `${point.x},${point.y}`).join(' ')}
+                    />
+                  )
+                })}
+              </svg>
+            )}
           </div>
           <figcaption title={fileName}>{fileName}</figcaption>
         </figure>

@@ -8,6 +8,16 @@ export function normalizeWords(value: string) {
     .replace(/\s+/g, ' ')
 }
 
+export function normalizeFieldText(value: string) {
+  return value
+    .normalize('NFKD')
+    .replace(/[’‘]/g, "'")
+    .replace(/[^a-zA-Z0-9%&]+/g, ' ')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+}
+
 export function collapseWhitespace(value: string) {
   return value.replace(/[\u00a0\s]+/g, ' ').trim()
 }

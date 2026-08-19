@@ -66,6 +66,44 @@ describe('ReviewResults', () => {
     expect(container.querySelector('.ocr-highlight-box')).toHaveClass('highlight-mismatch')
   })
 
+  it('renders transformed OCR coordinates as an angled polygon', async () => {
+    const user = userEvent.setup()
+    const angledResult: ReviewOutcome = {
+      ...result,
+      checks: result.checks.map((check) =>
+        check.id === 'warningText' && check.highlight
+          ? {
+              ...check,
+              highlight: {
+                ...check.highlight,
+                boxes: [{
+                  x0: 10,
+                  y0: 120,
+                  x1: 40,
+                  y1: 138,
+                  points: [
+                    { x: 10, y: 124 },
+                    { x: 40, y: 120 },
+                    { x: 40, y: 134 },
+                    { x: 10, y: 138 },
+                  ],
+                }],
+              },
+            }
+          : check,
+      ),
+    }
+    const { container } = render(
+      <ReviewResults result={angledResult} previewUrl="label.png" fileName="label.png" />,
+    )
+
+    await user.hover(screen.getByRole('article', { name: /Government warning wording/i }))
+    expect(container.querySelector('polygon')).toHaveAttribute(
+      'points',
+      '10,124 40,120 40,134 10,138',
+    )
+  })
+
   it('keeps a highlight selected after pointer hover ends', async () => {
     const user = userEvent.setup()
     const { container } = render(

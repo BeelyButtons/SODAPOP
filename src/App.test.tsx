@@ -7,6 +7,7 @@ describe('App', () => {
   it('explains the local processing boundary', () => {
     render(<App />)
 
+    expect(window.location.pathname).toBe('/review')
     expect(screen.getByText(/Images stay in this browser/i)).toBeInTheDocument()
     expect(screen.getByText(/Decision-support, not automatic approval/i)).toBeInTheDocument()
   })

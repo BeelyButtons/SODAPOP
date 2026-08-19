@@ -9,6 +9,7 @@ type SampleVariant =
   | 'angled-photo'
   | 'glare-photo'
   | 'dark-label'
+  | 'upside-down'
 
 export type SampleLabel = {
   id: SampleVariant
@@ -89,6 +90,12 @@ export const SAMPLE_LABELS: SampleLabel[] = [
     name: 'Reverse dark label',
     description: 'A dark, wide back label with light type and a different visual hierarchy.',
     application: ORCHARD_APPLICATION,
+  },
+  {
+    id: 'upside-down',
+    name: 'Upside-down photo',
+    description: 'A complete label rotated 180 degrees to verify orientation recovery.',
+    application: INITIAL_APPLICATION,
   },
 ]
 
@@ -234,6 +241,10 @@ export async function createSampleFile(variant: SampleVariant) {
   } else {
     canvas.width = image.naturalWidth
     canvas.height = image.naturalHeight
+    if (variant === 'upside-down') {
+      context.translate(canvas.width, canvas.height)
+      context.rotate(Math.PI)
+    }
     context.drawImage(image, 0, 0)
     if (variant === 'glare-photo') {
       const glare = context.createLinearGradient(250, 0, 950, 1300)

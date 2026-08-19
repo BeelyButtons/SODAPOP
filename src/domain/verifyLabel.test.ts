@@ -86,6 +86,20 @@ describe('verifyLabel', () => {
     expect(outcome.checks.find((check) => check.id === 'brand')?.status).toBe('pass')
   })
 
+  it('does not silently discard a required brand ampersand', () => {
+    const outcome = verifyLabel({
+      application: { ...INITIAL_APPLICATION, brandName: 'EMBER & ASH' },
+      ocrText: validOcrText.replace('OLD TOM DISTILLERY', 'EMBER ASH'),
+      ocrConfidence: 95,
+      durationMs: 1_250,
+    })
+
+    expect(outcome.checks.find((check) => check.id === 'brand')).toMatchObject({
+      status: 'needs_review',
+      explanation: expect.stringContaining('ampersand'),
+    })
+  })
+
   it('reports a numeric ABV mismatch', () => {
     const outcome = review(validOcrText.replace('45% Alc./Vol. (90 Proof)', '42% Alc./Vol. (84 Proof)'))
 
@@ -107,6 +121,25 @@ describe('verifyLabel', () => {
     const outcome = review('OLD TOM DISTILLERY\n45% Alc./Vol. (90 Proof)\n750 mL', 52)
 
     expect(outcome.checks.find((check) => check.id === 'warningText')?.status).toBe('needs_review')
+  })
+
+  it('does not call an undetected warning a confirmed mismatch solely from high OCR confidence', () => {
+    const outcome = review('OLD TOM DISTILLERY\n45% Alc./Vol. (90 Proof)\n750 mL', 94)
+
+    expect(outcome.checks.find((check) => check.id === 'warningText')?.status).toBe('needs_review')
+    expect(outcome.checks.find((check) => check.id === 'warningFormat')?.status).toBe('needs_review')
+  })
+
+  it('flags an explicit responsibility statement that replaces the federal warning', () => {
+    const outcome = review(`${validOcrText.split('GOVERNMENT WARNING:')[0]}PLEASE ENJOY RESPONSIBLY.`, 94)
+
+    expect(outcome.checks.find((check) => check.id === 'warningText')?.status).toBe('mismatch')
+  })
+
+  it('refers a partially detected alcohol statement to staff instead of inventing a mismatch', () => {
+    const outcome = review(validOcrText.replace('45% Alc./Vol. (90 Proof)', '45% Alc./Vol.'))
+
+    expect(outcome.checks.find((check) => check.id === 'alcohol')?.status).toBe('needs_review')
   })
 
   it('attaches OCR coordinates to both government warning checks', () => {
