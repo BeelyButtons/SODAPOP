@@ -1,17 +1,20 @@
-# LabelCheck
+# SODAPOP
 
-An AI-assisted proof of concept for reviewing distilled-spirits label artwork against selected TTB COLA application values and federal warning requirements.
+SODAPOP — System for Optical Detection, Analysis & Packaging-Oversight Processing — is an AI-assisted proof of concept for reviewing distilled-spirits label artwork against selected TTB COLA application values and federal warning requirements.
 
-> **Prototype boundary:** LabelCheck is decision support, not an approval system. It surfaces evidence, discrepancies, and uncertainty for a qualified human reviewer.
+> **Prototype boundary:** SODAPOP is decision support, not an autonomous approval system. It surfaces evidence, discrepancies, and uncertainty, then requires a qualified staff member to make and submit the final Pass or Fail decision.
 
 ## Current status
 
 - Single-label review: working
-- Synthetic compliant and failure cases: included
+- Staff Pass/Fail determination for every reviewed item: working
+- Final decision rule and submission control: working
+- Synthetic compliant, failure, varied-layout, and difficult-photo cases: included
 - Local OCR benchmark: 0.6–1.1 seconds on the included 1400×1900 samples after local testing
-- Automated checks: 13 passing tests
+- Coordinate-backed label highlighting: working
+- Automated verification: 23 tests, production build, and lint checks passing
 - Batch review: planned after the single-label workflow is validated
-- Live URL: pending GitHub Pages publication
+- Live URL: [https://beelybuttons.github.io/SODAPOP/](https://beelybuttons.github.io/SODAPOP/)
 
 ## What it does
 
@@ -19,10 +22,20 @@ An AI-assisted proof of concept for reviewing distilled-spirits label artwork ag
 2. Preprocesses the image and runs Tesseract LSTM OCR entirely in the browser.
 3. Compares brand name, class/type, alcohol content, and net contents.
 4. Checks the government warning’s exact wording and required uppercase heading.
-5. Reports `Pass`, `Mismatch`, or `Human review` for every check with observed evidence.
-6. Measures processing time against the five-second usability target.
+5. Reports automated `Pass`, `Mismatch`, or `Human review` findings with expected and observed evidence.
+6. Highlights detected label text in green for a match, red for a confirmed issue, or amber for human review.
+7. Requires staff to mark every investigated item `Pass` or `Fail` after examining the evidence.
+8. Determines the final result: every item must be marked `Pass`; one or more `Fail` decisions produce a final `Fail`.
+9. Enables `Submit final decision` only after every item has a staff determination.
+10. Measures processing time against the five-second usability target.
 
-The included synthetic cases demonstrate a matching label, incorrect ABV, incorrect warning capitalization, and a missing warning.
+The included synthetic cases demonstrate a matching label, incorrect ABV, incorrect warning capitalization, improperly bold warning body text, a missing warning, varied label layouts, reverse light-on-dark type, an angled tabletop photograph, and glare/low contrast.
+
+## Product direction and iterative improvement
+
+The workflow is being improved through repeated hands-on review by the project owner in collaboration with Codex. The project owner has driven the practical improvements: simplifying the opening experience, moving privacy information out of the way, making the label easier to inspect, identifying misleading sample-label behavior, requesting status-aware highlights, broadening the test-label designs, and requiring an explicit staff decision instead of treating automation as approval.
+
+That iterative review materially changed the product from a basic OCR comparison demo into a staff-centered decision-support workflow. Each improvement is evaluated against a simple principle: automation should help staff locate and understand evidence, while staff retain responsibility for the regulatory determination.
 
 ## Why this architecture
 
@@ -64,7 +77,7 @@ The automated rule checks:
 - Required uppercase `GOVERNMENT WARNING` heading
 - Container-based type-size and characters-per-inch requirement presented to the reviewer
 
-The app deliberately returns `Human review` for bolding, physical type size, contrast, and separation when they cannot be proven from a raster image. A photograph has no reliable physical scale, and OCR does not establish font weight.
+The app compares detected ink density within the warning to flag a clear case where body text appears materially bolder than surrounding body lines. It still returns `Human review` for uncertain weight, physical type size, contrast, and separation when they cannot be proven from a raster image. A photograph has no reliable physical scale, and OCR-based weight detection remains an aid rather than conclusive physical measurement.
 
 ## Security, privacy, and retention
 
@@ -73,6 +86,7 @@ This prototype minimizes its data boundary instead of claiming production federa
 - Images are processed locally in browser memory.
 - No image, OCR text, application value, or user identity is uploaded or retained.
 - No database, cookies, analytics, or user accounts are used.
+- Staff determinations and the submitted final decision exist only in the current browser session; they are not transmitted or retained.
 - Files are limited to 10 MB and validated by size, declared MIME type, and binary signature.
 - Only JPEG, PNG, and WebP inputs are accepted; SVG and executable formats are rejected.
 - Repository and deployment workflows contain no credentials.
@@ -113,7 +127,7 @@ Third-party runtime notices are retained under `licenses/`.
 
 ```text
 src/
-  components/       Accessible form, upload, and result views
+  components/       Accessible intake, evidence, staff-decision, and result views
   data/             Synthetic label fixtures
   domain/           Schemas, normalization, and verification rules
   ocr/              Local OCR initialization and preprocessing
@@ -126,7 +140,7 @@ public/ocr/          Same-origin OCR worker, runtime, and language assets
 
 - The initial scope is distilled spirits; wine and malt-beverage rules are not implemented.
 - This prototype uses manual application entry. Batch CSV input comes next.
-- OCR accuracy depends on image quality. Glare, curvature, perspective, and decorative typography require broader evaluation.
+- OCR accuracy depends on image quality. Included glare, perspective, varied-layout, and reverse-type fixtures expose these limitations for staff evaluation.
 - The five-second result is a development-machine measurement on synthetic fixtures, not a service-level guarantee.
 - Physical font measurements cannot be conclusively derived from ordinary photographs.
 - Fuzzy matching assists triage but never overrides an exact regulatory rule.
@@ -138,8 +152,9 @@ The current implementation has no application runtime fee: all processing is loc
 
 ## Next increment
 
-1. Add CSV plus multiple-image batch intake with deterministic image-to-row matching.
-2. Process a limited number of labels concurrently and preserve per-item failures.
-3. Export a review summary.
-4. Add distorted, rotated, low-light, and glare fixtures and publish benchmark results.
-5. Add wine and malt-beverage rule modules if time permits.
+1. Validate the staff confirmation and final-decision workflow with single-label reviewers.
+2. Continue the single-label rule sequence with brand name, alcohol content, net contents, and additional checks.
+3. Add CSV plus multiple-image batch intake with deterministic image-to-row matching.
+4. Process a limited number of labels concurrently and preserve per-item failures and staff decisions.
+5. Export a review summary.
+6. Expand photo-quality benchmarks and add wine and malt-beverage rule modules if appropriate.
