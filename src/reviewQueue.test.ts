@@ -1,36 +1,45 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
   clearQueueProgress,
+  completedIdFromRoute,
   nextRemainingSample,
   queueIdFromRoute,
   readQueueProgress,
+  repeatIdFromRoute,
   saveQueueProgress,
+  type QueueDecision,
+  type ReviewRecord,
 } from './reviewQueue'
+
+function record(finalDecision: QueueDecision): ReviewRecord {
+  return { finalDecision, staffDecisions: {}, rotationDegrees: 0, completedAt: '2026-08-18T00:00:00.000Z' }
+}
 
 describe('review queue', () => {
   beforeEach(() => window.localStorage.clear())
 
   it('stores queue decisions only in browser storage', () => {
-    saveQueueProgress({ valid: 'pass', 'wrong-abv': 'fail' })
-    expect(readQueueProgress()).toEqual({ valid: 'pass', 'wrong-abv': 'fail' })
+    const progress = { valid: record('pass'), 'wrong-abv': record('fail') }
+    saveQueueProgress(progress)
+    expect(readQueueProgress()).toEqual(progress)
     clearQueueProgress()
     expect(readQueueProgress()).toEqual({})
   })
 
   it('resumes with the first remaining case', () => {
-    expect(nextRemainingSample({ valid: 'pass' })?.id).toBe('wrong-abv')
+    expect(nextRemainingSample({ valid: record('pass') })?.id).toBe('wrong-abv')
   })
 
   it('wraps to any remaining case after a completed review', () => {
     const progress = {
-      valid: 'pass' as const,
-      'wrong-abv': 'fail' as const,
-      'warning-case': 'pass' as const,
-      'warning-bold': 'pass' as const,
-      'missing-warning': 'fail' as const,
-      'angled-photo': 'pass' as const,
-      'glare-photo': 'pass' as const,
-      'upside-down': 'pass' as const,
+      valid: record('pass'),
+      'wrong-abv': record('fail'),
+      'warning-case': record('pass'),
+      'warning-bold': record('pass'),
+      'missing-warning': record('fail'),
+      'angled-photo': record('pass'),
+      'glare-photo': record('pass'),
+      'upside-down': record('pass'),
     }
     expect(nextRemainingSample(progress, 'upside-down')?.id).toBe('dark-label')
   })
@@ -38,5 +47,8 @@ describe('review queue', () => {
   it('extracts a queue id without treating the new-review route as a case', () => {
     expect(queueIdFromRoute('/review/glare-photo')).toBe('glare-photo')
     expect(queueIdFromRoute('/review/new')).toBeNull()
+    expect(queueIdFromRoute('/review/completed/valid')).toBeNull()
+    expect(completedIdFromRoute('/review/completed/valid')).toBe('valid')
+    expect(repeatIdFromRoute('/review/completed/valid/review-again')).toBe('valid')
   })
 })

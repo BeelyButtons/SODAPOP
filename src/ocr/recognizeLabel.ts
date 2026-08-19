@@ -72,6 +72,10 @@ async function getWorker() {
   return workerPromise
 }
 
+export async function warmOcrEngine() {
+  await getWorker()
+}
+
 type TesseractWord = {
   text: string
   confidence: number

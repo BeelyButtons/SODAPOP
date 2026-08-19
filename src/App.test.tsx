@@ -35,6 +35,6 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: /Start \/ Restart label reviews/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Compliant example/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Upside-down photo/i })).toBeInTheDocument()
-    expect(screen.getByLabelText(/9 labels remaining and 0 completed/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/9 labels remaining/i)).toBeInTheDocument()
   })
 })

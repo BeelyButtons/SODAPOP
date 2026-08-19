@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useMemo, useState, type CSSProperties, type KeyboardEvent, type MouseEvent } from 'react'
 import type { CheckStatus, ReviewCheck, ReviewOutcome } from '../domain/reviewSchema'
+import type { QueueDecision, SavedRotation, StaffDecisions } from '../reviewQueue'
 
 const statusLabels: Record<CheckStatus, string> = {
   pass: 'Pass',
@@ -7,38 +8,61 @@ const statusLabels: Record<CheckStatus, string> = {
   needs_review: 'Human review',
 }
 
-type StaffDecision = 'pass' | 'fail'
-type StaffDecisions = Partial<Record<ReviewCheck['id'], StaffDecision>>
+const statusPriority: Record<CheckStatus, number> = { mismatch: 0, needs_review: 1, pass: 2 }
 
 type Props = {
   result: ReviewOutcome
   previewUrl: string
   fileName: string
-  queueMode?: boolean
-  onFinalDecision?: (decision: StaffDecision) => void
+  readOnly?: boolean
+  initialDecisions?: StaffDecisions
+  initialRotation?: SavedRotation
+  recordedDecision?: QueueDecision
+  onFinalDecision?: (decision: QueueDecision, decisions: StaffDecisions, rotation: SavedRotation) => void
+  onPause?: () => void
 }
 
 function CheckCard({
   check,
   active,
   decision,
+  readOnly,
+  recordedDecision,
   onDecision,
   onPreview,
   onSelect,
 }: {
   check: ReviewCheck
   active: boolean
-  decision?: StaffDecision
-  onDecision: (id: ReviewCheck['id'], decision: StaffDecision) => void
+  decision?: QueueDecision
+  readOnly: boolean
+  recordedDecision?: QueueDecision
+  onDecision: (id: ReviewCheck['id'], decision: QueueDecision) => void
   onPreview: (id: ReviewCheck['id'] | null) => void
   onSelect: (id: ReviewCheck['id']) => void
 }) {
   const interactive = Boolean(check.highlight)
 
+  function selectFromCard(event: MouseEvent<HTMLElement>) {
+    if (!interactive || (event.target as HTMLElement).closest('button')) return
+    onSelect(check.id)
+  }
+
+  function selectFromKeyboard(event: KeyboardEvent<HTMLElement>) {
+    if (!interactive || (event.key !== 'Enter' && event.key !== ' ')) return
+    event.preventDefault()
+    onSelect(check.id)
+  }
+
   return (
     <article
       className={`check-card check-status-${check.status}${interactive ? ' check-card-highlightable' : ''}${active ? ' check-card-active' : ''}`}
       aria-label={`${check.label} automated finding`}
+      tabIndex={interactive ? 0 : undefined}
+      onClick={selectFromCard}
+      onKeyDown={selectFromKeyboard}
+      onFocus={() => interactive && onPreview(check.id)}
+      onBlur={() => interactive && onPreview(null)}
       onMouseEnter={() => interactive && onPreview(check.id)}
       onMouseLeave={() => interactive && onPreview(null)}
     >
@@ -47,260 +71,231 @@ function CheckCard({
           <span className={`status-icon status-${check.status}`} aria-hidden="true">
             {check.status === 'pass' ? '✓' : check.status === 'mismatch' ? '×' : '?'}
           </span>
-          <h3>{check.label}</h3>
+          <h3><span>{check.label}:</span> {check.expected}</h3>
         </div>
         <span className={`status-badge status-${check.status}`}>{statusLabels[check.status]}</span>
       </div>
-      {interactive && (
-        <button
-          className="highlight-trigger"
-          type="button"
-          aria-pressed={active}
-          onClick={() => onSelect(check.id)}
-          onFocus={() => onPreview(check.id)}
-          onBlur={() => onPreview(null)}
-        >
-          Locate detected area on label
-        </button>
-      )}
-      <p className="check-explanation">{check.explanation}</p>
-      <div className="evidence-grid">
-        <div><span>Application / requirement</span><p>{check.expected}</p></div>
-        <div><span>Observed on label</span><p>{check.observed}</p></div>
-      </div>
-      <fieldset className="staff-decision">
-        <legend>Staff determination</legend>
-        <p>After reviewing the evidence, confirm whether this item passes or fails.</p>
-        <div>
-          <button
-            className={decision === 'pass' ? 'decision-button decision-pass selected' : 'decision-button decision-pass'}
-            type="button"
-            aria-pressed={decision === 'pass'}
-            onClick={() => onDecision(check.id, 'pass')}
-          >
-            Pass
-          </button>
-          <button
-            className={decision === 'fail' ? 'decision-button decision-fail selected' : 'decision-button decision-fail'}
-            type="button"
-            aria-pressed={decision === 'fail'}
-            onClick={() => onDecision(check.id, 'fail')}
-          >
-            Fail
-          </button>
+
+      <p className="check-explanation">
+        <strong>AI determination: {statusLabels[check.status]}.</strong> {check.explanation}
+      </p>
+
+      {readOnly ? (
+        <div className={`locked-decision locked-${decision ?? 'unknown'}`}>
+          <span>Staff determination</span>
+          <strong>{decision ? (decision === 'pass' ? 'Pass' : 'Fail') : recordedDecision === 'fail' ? 'Not required after confirmed failure' : 'Not recorded'}</strong>
         </div>
-      </fieldset>
+      ) : (
+        <fieldset className="staff-decision">
+          <legend>Staff determination</legend>
+          <div>
+            <button
+              className={decision === 'pass' ? 'decision-button decision-pass selected' : 'decision-button decision-pass'}
+              type="button"
+              aria-pressed={decision === 'pass'}
+              onClick={() => onDecision(check.id, 'pass')}
+            >
+              Pass
+            </button>
+            <button
+              className={decision === 'fail' ? 'decision-button decision-fail selected' : 'decision-button decision-fail'}
+              type="button"
+              aria-pressed={decision === 'fail'}
+              onClick={() => onDecision(check.id, 'fail')}
+            >
+              Fail
+            </button>
+          </div>
+        </fieldset>
+      )}
     </article>
   )
 }
 
-export function ReviewResults({ result, previewUrl, fileName, queueMode = false, onFinalDecision }: Props) {
+function normalizeRotation(value: number): SavedRotation {
+  return (((value % 360) + 360) % 360) as SavedRotation
+}
+
+export function ReviewResults({
+  result,
+  previewUrl,
+  fileName,
+  readOnly = false,
+  initialDecisions = {},
+  initialRotation = 0,
+  recordedDecision,
+  onFinalDecision,
+  onPause,
+}: Props) {
   const [previewedCheck, setPreviewedCheck] = useState<ReviewCheck['id'] | null>(null)
   const [selectedCheck, setSelectedCheck] = useState<ReviewCheck['id'] | null>(null)
-  const [staffDecisions, setStaffDecisions] = useState<StaffDecisions>({})
-  const [submitted, setSubmitted] = useState(false)
+  const [staffDecisions, setStaffDecisions] = useState<StaffDecisions>(initialDecisions)
   const [pendingFail, setPendingFail] = useState<ReviewCheck['id'] | null>(null)
-  const passed = result.checks.filter((check) => check.status === 'pass').length
-  const mismatches = result.checks.filter((check) => check.status === 'mismatch').length
-  const reviews = result.checks.filter((check) => check.status === 'needs_review').length
-  const underTarget = result.durationMs <= 5000
+  const [pendingPass, setPendingPass] = useState(false)
+  const [submittedDecision, setSubmittedDecision] = useState<QueueDecision | null>(null)
+  const [savedRotation, setSavedRotation] = useState<SavedRotation>(initialRotation)
+  const [draftRotation, setDraftRotation] = useState<SavedRotation>(initialRotation)
+  const [naturalSize, setNaturalSize] = useState({ width: 1, height: 1 })
+
+  const sortedChecks = useMemo(
+    () => result.checks.map((check, index) => ({ check, index }))
+      .sort((left, right) => statusPriority[left.check.status] - statusPriority[right.check.status] || left.index - right.index)
+      .map(({ check }) => check),
+    [result.checks],
+  )
   const activeCheckId = previewedCheck ?? selectedCheck
   const activeCheck = result.checks.find((check) => check.id === activeCheckId)
   const highlight = activeCheck?.highlight
   const highlightStatus = activeCheck?.status
-  const highlightLabel =
-    highlightStatus === 'pass'
-      ? 'Matched text'
-      : highlightStatus === 'mismatch'
-        ? 'Confirmed issue'
-        : 'Human review area'
   const decidedCount = result.checks.filter((check) => staffDecisions[check.id]).length
-  const allDecided = decidedCount === result.checks.length
-  const hasStaffFailure = result.checks.some((check) => staffDecisions[check.id] === 'fail')
-  const finalDecision = hasStaffFailure ? 'fail' : allDecided ? 'pass' : null
+  const dimensions = result.checks.find((check) => check.highlight)?.highlight
+  const sourceWidth = dimensions?.imageWidth ?? naturalSize.width
+  const sourceHeight = dimensions?.imageHeight ?? naturalSize.height
+  const quarterTurn = draftRotation === 90 || draftRotation === 270
+  const stageWidth = quarterTurn ? sourceHeight : sourceWidth
+  const stageHeight = quarterTurn ? sourceWidth : sourceHeight
+  const stageStyle: CSSProperties = { aspectRatio: `${stageWidth} / ${stageHeight}` }
+  const canvasStyle: CSSProperties = quarterTurn
+    ? {
+        width: `${(sourceWidth / sourceHeight) * 100}%`,
+        height: `${(sourceHeight / sourceWidth) * 100}%`,
+        transform: `translate(-50%, -50%) rotate(${draftRotation}deg)`,
+      }
+    : { width: '100%', height: '100%', transform: `translate(-50%, -50%) rotate(${draftRotation}deg)` }
 
   function selectCheck(id: ReviewCheck['id']) {
     setSelectedCheck((current) => (current === id ? null : id))
   }
 
-  function recordDecision(id: ReviewCheck['id'], decision: StaffDecision) {
+  function recordDecision(id: ReviewCheck['id'], decision: QueueDecision) {
     if (decision === 'fail') {
       setPendingFail(id)
       return
     }
-    setStaffDecisions((current) => ({ ...current, [id]: decision }))
-    setSubmitted(false)
+    const next = { ...staffDecisions, [id]: decision }
+    setStaffDecisions(next)
+    setSubmittedDecision(null)
+    if (result.checks.every((check) => next[check.id] === 'pass')) setPendingPass(true)
+  }
+
+  function submit(decision: QueueDecision, decisions: StaffDecisions) {
+    setSubmittedDecision(decision)
+    onFinalDecision?.(decision, decisions, savedRotation)
   }
 
   function confirmQuickFail() {
     if (!pendingFail) return
-    setStaffDecisions((current) => ({ ...current, [pendingFail]: 'fail' }))
+    const next = { ...staffDecisions, [pendingFail]: 'fail' as const }
+    setStaffDecisions(next)
     setPendingFail(null)
-    setSubmitted(true)
-    onFinalDecision?.('fail')
+    submit('fail', next)
   }
 
-  function submitFinalDecision() {
-    if (!finalDecision) return
-    setSubmitted(true)
-    onFinalDecision?.(finalDecision)
+  function confirmPass() {
+    setPendingPass(false)
+    submit('pass', staffDecisions)
   }
+
+  function rotate(delta: number) {
+    setDraftRotation((current) => normalizeRotation(current + delta))
+  }
+
+  function saveRotation() {
+    setSavedRotation(draftRotation)
+  }
+
+  const dialogDecision = pendingFail ? 'fail' : pendingPass ? 'pass' : null
 
   return (
     <section className="results-section" aria-labelledby="results-title">
-      <div className={`result-summary summary-${result.status}`}>
-        <div className="summary-icon" aria-hidden="true">
-          {result.status === 'mismatch' ? '!' : result.status === 'needs_review' ? '?' : '✓'}
-        </div>
+      <div className="review-command-bar">
         <div>
-          <p className="eyebrow">Automated review complete</p>
-          <h2 id="results-title">
-            {result.status === 'mismatch'
-              ? `${mismatches} ${mismatches === 1 ? 'discrepancy' : 'discrepancies'} found`
-              : result.status === 'needs_review'
-                ? 'Content checked; human review remains'
-                : 'All automated checks passed'}
-          </h2>
-          <p>{passed} passed · {reviews} need human review · {mismatches} mismatched</p>
+          <h2 id="results-title">{readOnly ? 'Completed label decision' : 'Make your label compliance determination'}</h2>
+          <strong>{readOnly ? `Final decision: ${recordedDecision === 'pass' ? 'Pass' : 'Fail'}` : `${decidedCount} of ${result.checks.length} decided`}</strong>
         </div>
-        <div className="metrics">
-          <div><strong>{Math.round(result.ocrConfidence)}%</strong><span>OCR confidence</span></div>
-          <div className={underTarget ? 'metric-good' : 'metric-slow'}>
-            <strong>{(result.durationMs / 1000).toFixed(1)}s</strong>
-            <span>{underTarget ? 'Within target' : 'Above 5s target'}</span>
-          </div>
-          {result.ocrAttempts && result.ocrAttempts > 1 && (
-            <div><strong>{result.ocrAttempts}</strong><span>OCR passes</span></div>
-          )}
+        <div className="compact-metrics">
+          <span><strong>{Math.round(result.ocrConfidence)}%</strong> OCR confidence</span>
+          <span className={result.durationMs <= 5000 ? 'metric-good' : 'metric-slow'}>
+            <strong>{(result.durationMs / 1000).toFixed(1)}s</strong> {result.durationMs <= 5000 ? 'within target' : 'above target'}
+          </span>
         </div>
-      </div>
-
-      <div className="review-instruction">
-        <span className="step-number">2</span>
-        <div>
-          <h2>Make the staff determination</h2>
-          <p>Review every automated finding and mark each item Pass or Fail. Automated findings are evidence, not the final decision.</p>
-        </div>
-        <strong>{decidedCount} of {result.checks.length} decided</strong>
+        {!readOnly && onPause && <button className="secondary-button" type="button" onClick={onPause}>Pause review</button>}
       </div>
 
       <div className="results-comparison">
         <figure className="results-preview" aria-label="Label artwork with OCR highlight">
           <div className="results-preview-heading">
-            <div>
-              <span>Label artwork</span>
-              <strong>{highlight ? activeCheck?.label : 'Select a highlighted result'}</strong>
+            <div><span>Label artwork</span><strong>{activeCheck?.label ?? 'Hover, focus, or tap a result'}</strong></div>
+            {highlight && <span className={`highlight-key highlight-${highlightStatus}`}><i /> {statusLabels[highlightStatus!]}</span>}
+          </div>
+
+          {!readOnly && (
+            <div className="rotation-controls" aria-label="Label orientation controls">
+              <button type="button" onClick={() => rotate(-90)} aria-label="Rotate 90 degrees counterclockwise">↶ 90°</button>
+              <button type="button" onClick={() => rotate(90)} aria-label="Rotate 90 degrees clockwise">90° ↷</button>
+              <button type="button" className="save-rotation" disabled={draftRotation === savedRotation} onClick={saveRotation}>Save orientation</button>
+              {draftRotation !== savedRotation && <button type="button" onClick={() => setDraftRotation(savedRotation)}>Cancel</button>}
             </div>
-            {highlight && (
-              <span className={`highlight-key highlight-${highlightStatus}`}>
-                <i /> {highlightLabel}
-              </span>
-            )}
+          )}
+
+          <div className="results-preview-frame rotation-stage" id="results-label-preview" style={stageStyle}>
+            <div className="rotation-canvas" style={canvasStyle}>
+              <img
+                src={previewUrl}
+                alt="Alcohol label used for this review"
+                onLoad={(event) => setNaturalSize({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight })}
+              />
+              {highlight && (
+                <svg className="ocr-highlight-layer" viewBox={`0 0 ${highlight.imageWidth} ${highlight.imageHeight}`} aria-hidden="true" preserveAspectRatio="none">
+                  {highlight.boxes.map((box, index) => {
+                    const points = box.points ?? [
+                      { x: box.x0, y: box.y0 }, { x: box.x1, y: box.y0 },
+                      { x: box.x1, y: box.y1 }, { x: box.x0, y: box.y1 },
+                    ]
+                    return <polygon className={`ocr-highlight-box highlight-${highlightStatus}`} key={`${box.x0}-${box.y0}-${index}`} points={points.map((point) => `${point.x},${point.y}`).join(' ')} />
+                  })}
+                </svg>
+              )}
+            </div>
           </div>
-          <div className="results-preview-frame" id="results-label-preview">
-            <img src={previewUrl} alt="Alcohol label used for this review" />
-            {highlight && (
-              <svg
-                className="ocr-highlight-layer"
-                viewBox={`0 0 ${highlight.imageWidth} ${highlight.imageHeight}`}
-                aria-hidden="true"
-                preserveAspectRatio="none"
-              >
-                {highlight.boxes.map((box, index) => {
-                  const points = box.points ?? [
-                    { x: box.x0, y: box.y0 },
-                    { x: box.x1, y: box.y0 },
-                    { x: box.x1, y: box.y1 },
-                    { x: box.x0, y: box.y1 },
-                  ]
-                  return (
-                    <polygon
-                      className={`ocr-highlight-box highlight-${highlightStatus}`}
-                      key={`${box.x0}-${box.y0}-${index}`}
-                      points={points.map((point) => `${point.x},${point.y}`).join(' ')}
-                    />
-                  )
-                })}
-              </svg>
-            )}
-          </div>
-          <figcaption title={fileName}>{fileName}</figcaption>
+          <figcaption title={fileName}>{fileName} · {draftRotation}° orientation</figcaption>
         </figure>
 
         <div>
           <div className="check-list">
-            {result.checks.map((check) => (
+            {sortedChecks.map((check) => (
               <CheckCard
                 check={check}
                 active={activeCheckId === check.id}
                 decision={staffDecisions[check.id]}
                 key={check.id}
+                readOnly={readOnly}
+                recordedDecision={recordedDecision}
                 onDecision={recordDecision}
                 onPreview={setPreviewedCheck}
                 onSelect={selectCheck}
               />
             ))}
           </div>
-
-          <details className="ocr-details">
-            <summary>View raw OCR text</summary>
-            <pre>{result.ocrText || 'No text was extracted.'}</pre>
-          </details>
+          <details className="ocr-details"><summary>View raw OCR text</summary><pre>{result.ocrText || 'No text was extracted.'}</pre></details>
         </div>
       </div>
 
-      <section className={`final-decision-panel${finalDecision ? ` final-${finalDecision}` : ''}`} aria-labelledby="final-decision-title">
-        <div className="final-decision-copy">
-          <span className="step-number">3</span>
-          <div>
-            <p className="eyebrow">Final staff decision</p>
-            <h2 id="final-decision-title">
-              {!finalDecision
-                ? 'Mark every item Pass, or use Fail to end this review'
-                : finalDecision === 'pass'
-                  ? 'Final determination: Pass'
-                  : 'Final determination: Fail'}
-            </h2>
-            <p>
-              {!finalDecision
-                ? `${result.checks.length - decidedCount} item${result.checks.length - decidedCount === 1 ? ' remains' : 's remain'}. A confirmed failure ends the review immediately.`
-                : finalDecision === 'pass'
-                  ? 'All reviewed items are marked Pass.'
-                  : 'At least one reviewed item is marked Fail, so the label cannot pass.'}
-            </p>
-          </div>
-        </div>
-        <button
-          className="primary-button final-submit-button"
-          type="button"
-          disabled={!allDecided || submitted}
-          onClick={submitFinalDecision}
-        >
-          {submitted ? 'Final decision submitted' : queueMode ? 'Submit Pass decision' : 'Submit final decision'}
-          {!submitted && <span aria-hidden="true">→</span>}
-        </button>
-        {submitted && (
-          <p className="submission-confirmation" role="status">
-            Final {finalDecision === 'pass' ? 'Pass' : 'Fail'} decision recorded for this browser session.
-          </p>
-        )}
-      </section>
+      {submittedDecision && !onFinalDecision && (
+        <p className={`decision-recorded-banner decision-${submittedDecision}`} role="status">Final {submittedDecision === 'pass' ? 'Pass' : 'Fail'} decision recorded for this browser session.</p>
+      )}
 
-      {pendingFail && (
+      {dialogDecision && (
         <div className="quick-fail-backdrop" role="presentation">
-          <section className="quick-fail-dialog" role="alertdialog" aria-modal="true" aria-labelledby="quick-fail-title">
-            <span className="quick-fail-icon" aria-hidden="true">!</span>
-            <p className="eyebrow">Quick fail</p>
-            <h2 id="quick-fail-title">Confirm this label has failed?</h2>
-            <p>
-              You found a non-compliant item. Confirming records a final Fail without requiring answers for the remaining checks.
-            </p>
+          <section className={`quick-fail-dialog decision-dialog-${dialogDecision}`} role="alertdialog" aria-modal="true" aria-labelledby="decision-dialog-title">
+            <span className="quick-fail-icon" aria-hidden="true">{dialogDecision === 'pass' ? '✓' : '!'}</span>
+            <p className="eyebrow">Final staff decision</p>
+            <h2 id="decision-dialog-title">Confirm this label has {dialogDecision === 'pass' ? 'passed' : 'failed'}?</h2>
+            <p>{dialogDecision === 'pass' ? 'Every item is marked Pass. Confirm the final compliant-label decision.' : 'Confirming records a final Fail without requiring answers for the remaining checks.'}</p>
             <div>
-              <button className="secondary-button" type="button" onClick={() => setPendingFail(null)}>
-                Go back to review
-              </button>
-              <button className="confirm-fail-button" type="button" onClick={confirmQuickFail} autoFocus>
-                Confirm failure
+              <button className="secondary-button" type="button" onClick={() => { setPendingFail(null); setPendingPass(false) }}>Go back to review</button>
+              <button className={dialogDecision === 'pass' ? 'confirm-pass-button' : 'confirm-fail-button'} type="button" onClick={dialogDecision === 'pass' ? confirmPass : confirmQuickFail} autoFocus>
+                Confirm {dialogDecision === 'pass' ? 'Pass decision' : 'failure'}
               </button>
             </div>
           </section>

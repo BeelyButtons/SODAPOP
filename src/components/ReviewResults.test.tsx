@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import type { ReviewOutcome } from '../domain/reviewSchema'
@@ -44,7 +44,7 @@ describe('ReviewResults', () => {
     expect(container.querySelectorAll('.ocr-highlight-box')).toHaveLength(0)
     await user.hover(screen.getByRole('article', { name: /Government warning wording/i }))
     expect(container.querySelectorAll('.ocr-highlight-box')).toHaveLength(1)
-    expect(screen.getByText('Matched text')).toBeInTheDocument()
+    expect(screen.getByText('Pass', { selector: '.highlight-key' })).toBeInTheDocument()
     expect(container.querySelector('.ocr-highlight-box')).toHaveClass('highlight-pass')
   })
 
@@ -62,7 +62,7 @@ describe('ReviewResults', () => {
     )
 
     await user.hover(screen.getByRole('article', { name: /Government warning wording/i }))
-    expect(screen.getByText('Confirmed issue')).toBeInTheDocument()
+    expect(screen.getByText('Mismatch', { selector: '.highlight-key' })).toBeInTheDocument()
     expect(container.querySelector('.ocr-highlight-box')).toHaveClass('highlight-mismatch')
   })
 
@@ -111,35 +111,31 @@ describe('ReviewResults', () => {
     )
     const check = screen.getByRole('article', { name: /Government warning wording/i })
 
-    await user.click(screen.getByRole('button', { name: /Locate detected area on label/i }))
+    await user.click(check)
     await user.unhover(check)
     expect(container.querySelectorAll('.ocr-highlight-box')).toHaveLength(1)
   })
 
-  it('shows a highlight when the location control receives keyboard focus', async () => {
-    const user = userEvent.setup()
+  it('shows a highlight when the card receives keyboard focus', () => {
     const { container } = render(
       <ReviewResults result={result} previewUrl="label.png" fileName="label.png" />,
     )
 
-    await user.tab()
-    expect(screen.getByRole('button', { name: /Locate detected area on label/i })).toHaveFocus()
+    const check = screen.getByRole('article', { name: /Government warning wording/i })
+    fireEvent.focus(check)
     expect(container.querySelectorAll('.ocr-highlight-box')).toHaveLength(1)
   })
 
-  it('requires every staff determination before enabling final submission', async () => {
+  it('requires every staff determination before offering pass confirmation', async () => {
     const user = userEvent.setup()
     render(<ReviewResults result={result} previewUrl="label.png" fileName="label.png" />)
-    const submit = screen.getByRole('button', { name: /Submit final decision/i })
-
-    expect(submit).toBeDisabled()
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
     for (const button of screen.getAllByRole('button', { name: 'Pass' })) {
       await user.click(button)
     }
 
-    expect(screen.getByRole('heading', { name: 'Final determination: Pass' })).toBeInTheDocument()
-    expect(submit).toBeEnabled()
-    await user.click(submit)
+    expect(screen.getByRole('heading', { name: /Confirm this label has passed/i })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /Confirm Pass decision/i }))
     expect(screen.getByText('Final Pass decision recorded for this browser session.')).toBeInTheDocument()
   })
 
@@ -156,7 +152,43 @@ describe('ReviewResults', () => {
     await user.click(failButtons[0])
     await user.click(screen.getByRole('button', { name: /Confirm failure/i }))
 
-    expect(screen.getByRole('heading', { name: 'Final determination: Fail' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Final decision submitted/i })).toBeDisabled()
+    expect(screen.getByText('Final Fail decision recorded for this browser session.')).toBeInTheDocument()
+  })
+
+  it('puts human-review findings before confident passes', () => {
+    render(<ReviewResults result={result} previewUrl="label.png" fileName="label.png" />)
+    const cards = screen.getAllByRole('article')
+    expect(cards[0]).toHaveAccessibleName(/Government warning format/i)
+    expect(cards[1]).toHaveAccessibleName(/Government warning wording/i)
+  })
+
+  it('rotates in 90-degree steps and requires saving the orientation', async () => {
+    const user = userEvent.setup()
+    render(<ReviewResults result={result} previewUrl="label.png" fileName="label.png" />)
+    const save = screen.getByRole('button', { name: /Save orientation/i })
+    expect(save).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: /Rotate 90 degrees clockwise/i }))
+    expect(screen.getByText(/90° orientation/i)).toBeInTheDocument()
+    expect(save).toBeEnabled()
+    await user.click(save)
+    expect(save).toBeDisabled()
+  })
+
+  it('renders completed decisions as locked evidence', () => {
+    render(
+      <ReviewResults
+        result={result}
+        previewUrl="label.png"
+        fileName="label.png"
+        readOnly
+        recordedDecision="fail"
+        initialDecisions={{ warningText: 'pass', warningFormat: 'fail' }}
+      />,
+    )
+
+    expect(screen.getByText('Final decision: Fail')).toBeInTheDocument()
+    expect(screen.getAllByText('Staff determination', { selector: '.locked-decision span' })).toHaveLength(2)
+    expect(screen.queryByRole('button', { name: 'Pass' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Fail' })).not.toBeInTheDocument()
   })
 })

@@ -9,6 +9,10 @@ SODAPOP — System for Optical Detection, Analysis & Packaging-Oversight Process
 - Single-label review: working
 - Resumable demonstration review queue: working
 - Quick-fail confirmation and automatic move to the next label: working
+- Remaining-only queue with locked completed-decision history: working
+- Review-again workflow that returns to completed decisions: working
+- Sticky reviewer controls with OCR confidence and elapsed time: working
+- Saved 90-degree label rotation without an OCR rerun: working
 - Staff Pass/Fail determination for every reviewed item: working
 - Final decision rule and submission control: working
 - Synthetic compliant, failure, varied-layout, and difficult-photo cases: included
@@ -17,13 +21,13 @@ SODAPOP — System for Optical Detection, Analysis & Packaging-Oversight Process
 - Angled-label deskewing and orientation-aware highlights: working
 - Conditional glare and alternate-orientation OCR retries: working
 - URL-aware SPA views for the queue, individual cases, new-label intake, and results: working
-- Automated verification: 33 tests, GitHub Pages production build, and lint checks passing
+- Automated verification: 37 tests, GitHub Pages production build, and lint checks passing
 - Batch review: planned after the single-label workflow is validated
 - Live URL: [https://beelybuttons.github.io/SODAPOP/](https://beelybuttons.github.io/SODAPOP/)
 
 ## What it does
 
-1. Presents all nine demonstration labels in a staff review queue with remaining and completed counts.
+1. Presents unfinished demonstration labels in a staff review queue with a remaining count.
 2. Starts with the first unfinished label, supports pausing, and resumes from browser-local progress.
 3. Also accepts selected application values and a JPEG, PNG, or WebP label image for an independent review.
 4. Preprocesses the image and runs Tesseract LSTM OCR entirely in the browser.
@@ -31,16 +35,23 @@ SODAPOP — System for Optical Detection, Analysis & Packaging-Oversight Process
 6. Checks the government warning’s exact wording and required uppercase heading.
 7. Reports automated `Pass`, `Mismatch`, or `Human review` findings with expected and observed evidence.
 8. Highlights detected label text in green for a match, red for a confirmed issue, or amber for human review.
-9. Requires staff to mark every investigated item `Pass` or `Fail` after examining the evidence.
-10. Allows a reviewer to confirm a failure immediately after the first failed item instead of answering irrelevant remaining questions.
-11. Determines the final result: every item must be marked `Pass`; one confirmed `Fail` decision ends the review as a final `Fail`.
-12. Moves to the next queued label after the final decision and returns to an empty queue when work is complete.
-13. Measures processing time against the five-second usability target.
+9. Sorts mismatches and human-review findings before confident passes so staff can fail fast.
+10. Keeps decision progress, OCR confidence, elapsed time, and Pause visible in a sticky review bar.
+11. Requires staff to mark every investigated item `Pass` or `Fail` after examining the evidence.
+12. Allows a reviewer to confirm a failure immediately after the first failed item instead of answering irrelevant remaining questions.
+13. Confirms a passing decision after every item is marked `Pass`, without a separate final-decision section.
+14. Moves to the next queued label after the final decision and returns to an empty queue when work is complete.
+15. Stores completed decisions in a separate locked history with an explicit Review Label Again action.
+16. Rotates any label preview in 90-degree steps while keeping OCR highlights aligned, without rerunning OCR for a display-only change.
+17. Measures processing time against the five-second usability target.
 
 The application uses meaningful browser routes even though it remains a client-side SPA:
 
 - `/SODAPOP/review` — review portal and demonstration queue
 - `/SODAPOP/review/:case-id` — an individual queued-label review
+- `/SODAPOP/review/completed` — completed label decisions
+- `/SODAPOP/review/completed/:case-id` — locked completed review
+- `/SODAPOP/review/completed/:case-id/review-again` — editable repeat review that returns to history
 - `/SODAPOP/review/new` — application values and independent label intake
 - `/SODAPOP/results` — automated evidence, staff determinations, and final decision
 
@@ -56,7 +67,8 @@ That iterative review materially changed the product from a basic OCR comparison
 
 ### Review queue and accessibility improvements
 
-- Every synthetic case is now visible in `Labels to Review`, including its purpose and staff disposition.
+- Every unfinished synthetic case is visible in `Labels to Review` with its purpose.
+- Completed cases leave `Labels to Review`; the portal shows only unfinished work and a single Remaining count.
 - `Start / Restart label reviews` opens the first unfinished case; `Pause review` returns to the queue without discarding completed decisions.
 - Each case has a meaningful browser URL, and the original independent upload form remains available under `New label`.
 - Queue progress is stored only in the current browser and can be reset from the portal.
@@ -64,6 +76,11 @@ That iterative review materially changed the product from a basic OCR comparison
 - Controls and evidence text are larger and higher contrast for reviewers who need more readable interfaces.
 - Pass and Fail controls use light semantic colors before selection and stronger colors after selection.
 - A Fail selection requires explicit confirmation, then records the label failure without forcing the reviewer through the remaining cards.
+- Mismatches appear first in prominent red cards, human-review findings follow in amber, and confident passes come last.
+- A sticky command bar keeps staff progress, OCR confidence, elapsed time, and Pause visible while the cards scroll.
+- Compact cards combine the checked item with its application requirement and remove duplicate observed-text and location-link clutter.
+- Completed decisions are locked against accidental edits. Review Label Again starts a fresh determination and returns to the reviewer’s position in completed history.
+- Label artwork can be rotated clockwise or counterclockwise and saved at 90-degree intervals. The image and highlight layer rotate together, avoiding an unnecessary OCR rerun and protecting the five-second budget.
 
 ### Recent OCR reliability improvements
 
@@ -134,7 +151,7 @@ This prototype minimizes its data boundary instead of claiming production federa
 - Images are processed locally in browser memory.
 - No image, OCR text, application value, or user identity is uploaded or retained.
 - No database, cookies, analytics, or user accounts are used.
-- Demonstration-queue Pass/Fail progress is saved in local browser storage so a reviewer can pause and restart. It can be cleared with `Reset review queue` and is never transmitted.
+- Demonstration decisions, per-check staff determinations, automated findings, timing, and saved orientation are stored in local browser storage so staff can pause, inspect locked history, and review a label again. They can be cleared with `Reset review queue` and are never transmitted.
 - Independent uploaded-label decisions remain session-only.
 - Files are limited to 10 MB and validated by size, declared MIME type, and binary signature.
 - Only JPEG, PNG, and WebP inputs are accepted; SVG and executable formats are rejected.

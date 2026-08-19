@@ -3,6 +3,7 @@ import './App.css'
 import { ApplicationForm } from './components/ApplicationForm'
 import { ReviewResults } from './components/ReviewResults'
 import { ReviewPortal } from './components/ReviewPortal'
+import { CompletedReviews } from './components/CompletedReviews'
 import { UploadPanel } from './components/UploadPanel'
 import { SAMPLE_LABELS, createSampleFile } from './data/sampleLabels'
 import {
@@ -13,17 +14,21 @@ import {
   type ReviewOutcome,
 } from './domain/reviewSchema'
 import { verifyLabel } from './domain/verifyLabel'
-import { recognizeLabel, type OcrProgress } from './ocr/recognizeLabel'
+import { recognizeLabel, warmOcrEngine, type OcrProgress } from './ocr/recognizeLabel'
 import { appUrl, useAppRoute, type AppRoute } from './routing'
 import {
   clearQueueProgress,
+  completedIdFromRoute,
   nextRemainingSample,
   queueIdFromRoute,
   queueSample,
   readQueueProgress,
+  repeatIdFromRoute,
   saveQueueProgress,
   type QueueDecision,
   type QueueProgress,
+  type SavedRotation,
+  type StaffDecisions,
 } from './reviewQueue'
 
 type FormErrors = Partial<Record<keyof ApplicationData | 'file' | 'form', string>>
@@ -38,10 +43,21 @@ function App() {
   const [loadingSample, setLoadingSample] = useState<string | null>(null)
   const [queueProgress, setQueueProgress] = useState<QueueProgress>(readQueueProgress)
   const processingQueueCase = useRef<string | null>(null)
-  const activeQueueId = queueIdFromRoute(route)
+  const completedScrollPosition = useRef(0)
+  const repeatQueueId = repeatIdFromRoute(route)
+  const completedQueueId = completedIdFromRoute(route)
+  const activeQueueId = repeatQueueId ?? queueIdFromRoute(route)
   const activeQueueSample = queueSample(activeQueueId)
+  const completedQueueSample = queueSample(completedQueueId)
+  const completedRecord = completedQueueId ? queueProgress[completedQueueId] : undefined
+  const repeatRecord = repeatQueueId ? queueProgress[repeatQueueId] : undefined
+  const isRepeatReview = Boolean(repeatQueueId)
 
   const previewUrl = useMemo(() => (file ? URL.createObjectURL(file) : null), [file])
+  useEffect(() => {
+    if (import.meta.env.MODE !== 'test') void warmOcrEngine().catch(() => undefined)
+  }, [])
+
   useEffect(() => {
     return () => {
       if (previewUrl) URL.revokeObjectURL(previewUrl)
@@ -51,12 +67,24 @@ function App() {
   useEffect(() => {
     if (route === '/results' && !result) navigate('/review', true)
     if (activeQueueId && !activeQueueSample) navigate('/review', true)
+    if (completedQueueId && (!completedQueueSample || !completedRecord)) navigate('/review/completed', true)
     document.title = route === '/review'
       ? 'Review portal · SODAPOP'
+      : route === '/review/completed'
+        ? 'Completed reviews · SODAPOP'
       : route === '/review/new'
         ? 'New label review · SODAPOP'
         : 'Review results · SODAPOP'
-  }, [activeQueueId, activeQueueSample, navigate, result, route])
+  }, [activeQueueId, activeQueueSample, completedQueueId, completedQueueSample, completedRecord, navigate, result, route])
+
+  useEffect(() => {
+    if (!completedQueueSample || file) return
+    let cancelled = false
+    void createSampleFile(completedQueueSample.id).then((sampleFile) => {
+      if (!cancelled) setFile(sampleFile)
+    })
+    return () => { cancelled = true }
+  }, [completedQueueSample, file])
 
   useEffect(() => {
     if (!activeQueueSample || result || processingQueueCase.current === activeQueueSample.id) return
@@ -224,11 +252,31 @@ function App() {
     setQueueProgress({})
   }
 
-  function completeQueueCase(decision: QueueDecision) {
+  function completeQueueCase(
+    decision: QueueDecision,
+    staffDecisions: StaffDecisions,
+    rotationDegrees: SavedRotation,
+  ) {
     if (!activeQueueSample) return
-    const updated = { ...queueProgress, [activeQueueSample.id]: decision }
+    const updated = {
+      ...queueProgress,
+      [activeQueueSample.id]: {
+        finalDecision: decision,
+        staffDecisions,
+        result: result ?? undefined,
+        rotationDegrees,
+        completedAt: new Date().toISOString(),
+      },
+    }
     saveQueueProgress(updated)
     setQueueProgress(updated)
+    if (isRepeatReview) {
+      setResult(null)
+      setFile(null)
+      navigate('/review/completed')
+      window.setTimeout(() => window.scrollTo({ top: completedScrollPosition.current }), 0)
+      return
+    }
     const next = nextRemainingSample(updated, activeQueueSample.id)
     setResult(null)
     setFile(null)
@@ -242,6 +290,33 @@ function App() {
     setResult(null)
     setFile(null)
     navigate('/review')
+  }
+
+  function openCompletedReviews() {
+    setResult(null)
+    setFile(null)
+    navigate('/review/completed')
+  }
+
+  function openCompletedReview(id: (typeof SAMPLE_LABELS)[number]['id']) {
+    completedScrollPosition.current = window.scrollY
+    setResult(null)
+    setFile(null)
+    navigate(`/review/completed/${id}`)
+  }
+
+  function returnToCompletedReviews() {
+    setResult(null)
+    setFile(null)
+    navigate('/review/completed')
+    window.setTimeout(() => window.scrollTo({ top: completedScrollPosition.current }), 0)
+  }
+
+  function reviewCompletedAgain(id: (typeof SAMPLE_LABELS)[number]['id']) {
+    setResult(null)
+    setFile(null)
+    setErrors({})
+    navigate(`/review/completed/${id}/review-again`)
   }
 
   return (
@@ -286,7 +361,51 @@ function App() {
 
       <main id="top">
         {route === '/review' && (
-          <ReviewPortal progress={queueProgress} onStart={startQueue} onSelect={openQueueCase} onReset={resetQueue} />
+          <ReviewPortal
+            progress={queueProgress}
+            onStart={startQueue}
+            onSelect={openQueueCase}
+            onCompleted={openCompletedReviews}
+            onReset={resetQueue}
+          />
+        )}
+
+        {route === '/review/completed' && (
+          <CompletedReviews progress={queueProgress} onBack={() => navigate('/review')} onOpen={openCompletedReview} />
+        )}
+
+        {completedQueueSample && completedRecord && (
+          <>
+            <div className="results-page-heading completed-detail-heading">
+              <div>
+                <p className="eyebrow">Locked completed review</p>
+                <h1>{completedQueueSample.name}</h1>
+                <p>{completedQueueSample.description}</p>
+              </div>
+              <div className="completed-detail-actions">
+                <button className="secondary-button" type="button" onClick={returnToCompletedReviews}>← Completed reviews</button>
+                <button className="primary-button" type="button" onClick={() => reviewCompletedAgain(completedQueueSample.id)}>Review Label Again</button>
+              </div>
+            </div>
+            {completedRecord.result ? (
+              previewUrl && file ? (
+                <ReviewResults
+                  result={completedRecord.result}
+                  previewUrl={previewUrl}
+                  fileName={file.name}
+                  readOnly
+                  initialDecisions={completedRecord.staffDecisions}
+                  initialRotation={completedRecord.rotationDegrees}
+                  recordedDecision={completedRecord.finalDecision}
+                />
+              ) : <div className="progress-panel"><strong>Loading saved label artwork…</strong></div>
+            ) : (
+              <div className="legacy-review-note">
+                <h2>Earlier decision: {completedRecord.finalDecision === 'pass' ? 'Pass' : 'Fail'}</h2>
+                <p>This decision predates detailed review history. Choose Review Label Again to create a complete locked record.</p>
+              </div>
+            )}
+          </>
         )}
 
         {route === '/review/new' && <section className="workspace workspace-new" aria-label="Single-label review workspace">
@@ -349,13 +468,10 @@ function App() {
         {activeQueueSample && (
           <div className="results-page-heading queue-review-heading">
             <div>
-              <p className="eyebrow">Queued label review</p>
+              <p className="eyebrow">{isRepeatReview ? 'Reviewing completed label again' : 'Queued label review'}</p>
               <h1>{activeQueueSample.name}</h1>
               <p>{activeQueueSample.description}</p>
             </div>
-            <button className="secondary-button" type="button" onClick={pauseQueue}>
-              Pause review
-            </button>
           </div>
         )}
 
@@ -374,8 +490,9 @@ function App() {
             result={result}
             previewUrl={previewUrl}
             fileName={file.name}
-            queueMode
+            initialRotation={repeatRecord?.rotationDegrees ?? 0}
             onFinalDecision={completeQueueCase}
+            onPause={isRepeatReview ? returnToCompletedReviews : pauseQueue}
           />
         )}
 
