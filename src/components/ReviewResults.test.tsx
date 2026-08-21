@@ -1,6 +1,6 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ReviewOutcome } from '../domain/reviewSchema'
 import { ReviewResults } from './ReviewResults'
 
@@ -43,6 +43,8 @@ const result: ReviewOutcome = {
 }
 
 describe('ReviewResults', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
   it('shows OCR boxes when a coordinate-backed result is hovered', async () => {
     const user = userEvent.setup()
     const { container } = render(
@@ -145,6 +147,65 @@ describe('ReviewResults', () => {
     expect(screen.getByRole('heading', { name: /Confirm this label has passed/i })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /Confirm Pass decision/i }))
     expect(screen.getByText('Final Pass decision recorded for this browser session.')).toBeInTheDocument()
+  })
+
+  it('places Fail before Pass on every undecided review card', () => {
+    render(<ReviewResults result={result} previewUrl="label.png" fileName="label.png" />)
+
+    for (const card of screen.getAllByRole('article')) {
+      const buttons = within(card).getAllByRole('button')
+      expect(buttons.map((button) => button.textContent)).toEqual(['Fail', 'Pass'])
+    }
+  })
+
+  it('unlocks bulk pass only after every card was viewed and affects only green findings', async () => {
+    const user = userEvent.setup()
+    let observerCallback: IntersectionObserverCallback | undefined
+    class MockIntersectionObserver {
+      constructor(callback: IntersectionObserverCallback) { observerCallback = callback }
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+    vi.stubGlobal('IntersectionObserver', MockIntersectionObserver)
+    const bulkResult: ReviewOutcome = {
+      ...result,
+      checks: [
+        ...result.checks,
+        {
+          id: 'conflict',
+          label: 'Conflicting statement',
+          status: 'mismatch',
+          expected: 'Expected statement',
+          observed: 'Conflicting statement',
+          explanation: 'A conflict was detected.',
+        },
+      ],
+    }
+    render(<ReviewResults result={bulkResult} previewUrl="label.png" fileName="label.png" />)
+    const cards = screen.getAllByRole('article')
+
+    expect(screen.queryByRole('button', { name: /Pass all remaining green/i })).not.toBeInTheDocument()
+    act(() => observerCallback?.([
+      { target: cards[cards.length - 1], isIntersecting: true } as unknown as IntersectionObserverEntry,
+    ], {} as IntersectionObserver))
+    expect(screen.queryByRole('button', { name: /Pass all remaining green/i })).not.toBeInTheDocument()
+
+    act(() => observerCallback?.(cards.map((target) => (
+      { target, isIntersecting: true } as unknown as IntersectionObserverEntry
+    )), {} as IntersectionObserver))
+    await user.click(screen.getByRole('button', { name: 'Pass all remaining green item' }))
+
+    const greenCard = screen.getByRole('article', { name: /Government warning wording/i })
+    const amberCard = screen.getByRole('article', { name: /Government warning format/i })
+    const redCard = screen.getByRole('article', { name: /Conflicting statement/i })
+    expect(within(greenCard).getByRole('button', { name: 'Pass' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(amberCard).getByRole('button', { name: 'Pass' })).toHaveAttribute('aria-pressed', 'false')
+    expect(within(redCard).getByRole('button', { name: 'Pass' })).toHaveAttribute('aria-pressed', 'false')
+    const reminder = screen.getByRole('alertdialog', { name: /Review the remaining red and amber items/i })
+    expect(within(reminder).getByText('Government warning format')).toBeInTheDocument()
+    expect(within(reminder).getByText('Conflicting statement')).toBeInTheDocument()
+    expect(within(reminder).getByText(/must each be marked Pass or Fail/i)).toBeInTheDocument()
   })
 
   it('makes the final determination fail when any item is marked fail', async () => {

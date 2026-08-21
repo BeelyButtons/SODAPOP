@@ -1,5 +1,5 @@
 import { bestObservedLine, normalizeWords, similarity } from './normalization'
-import type { ApplicationData, CheckStatus, ReviewCheck } from './reviewSchema'
+import type { ApplicationData, CheckStatus, HighlightRegion, ReviewCheck } from './reviewSchema'
 import { evaluateRuleSet, type RuleApplicability } from './ruleEngine'
 
 type CoreCheckId = 'brand' | 'classType' | 'alcohol' | 'netContents' | 'warningText' | 'warningFormat'
@@ -21,6 +21,12 @@ const coreRuleChecks: Record<string, CoreCheckId> = {
   'spirits.net-contents': 'netContents',
 }
 
+const findingLabels: Record<CheckStatus, string> = {
+  pass: 'Pass',
+  mismatch: 'Mismatch',
+  needs_review: 'Human review',
+}
+
 function observedPhrase(phrase: string, text: string) {
   const normalizedPhrase = normalizeWords(phrase)
   if (normalizeWords(text).includes(normalizedPhrase)) return phrase
@@ -38,6 +44,7 @@ function card(
   observed: string,
   explanation: string,
   requirements?: string[],
+  evidence?: Pick<ReviewCheck, 'applicabilityExplanation' | 'applicationEvidence' | 'labelEvidence'>,
 ): ReviewCheck {
   return {
     id: rule.rule.id,
@@ -48,6 +55,21 @@ function card(
     requirements,
     observed,
     explanation,
+    ...evidence,
+  }
+}
+
+function combinedHighlight(checks: ReviewCheck[]): HighlightRegion | undefined {
+  const regions = checks.flatMap((check) => check.highlight ? [check.highlight] : [])
+  const first = regions[0]
+  if (!first) return undefined
+  const compatible = regions.filter((region) => (
+    region.imageWidth === first.imageWidth && region.imageHeight === first.imageHeight
+  ))
+  return {
+    imageWidth: first.imageWidth,
+    imageHeight: first.imageHeight,
+    boxes: compatible.flatMap((region) => region.boxes),
   }
 }
 
@@ -91,7 +113,7 @@ function textEvidenceCard(
     rule,
     'mismatch',
     missing.length === expectedPhrases.length ? 'Required statement not found' : observed,
-    `Readable OCR did not contain the required packet-matched statement${missing.length > 1 ? 's' : ''}: ${missing.join('; ')}.`,
+    `Readable OCR did not contain the statement${missing.length > 1 ? 's' : ''} required by the application or supporting information: ${missing.join('; ')}.`,
     expectedPhrases,
   )
 }
@@ -111,7 +133,7 @@ function nameAddressCard(rule: RuleApplicability, application: ApplicationData, 
       rule,
       'pass',
       `${phrase} ${name}, ${address}`,
-      'The responsibility phrase, permit name, and city/State match the review packet. Formatting remains visible for staff confirmation.',
+      'The responsibility phrase, permit name, and city/State match the application information. Formatting remains visible for staff confirmation.',
       [`Authorized ${application.source} responsibility phrase`, name, address],
     )
   }
@@ -127,28 +149,51 @@ function nameAddressCard(rule: RuleApplicability, application: ApplicationData, 
 
 function sameFieldCard(rule: RuleApplicability, coreChecks: Input['coreChecks']) {
   const fieldChecks = [coreChecks.brand, coreChecks.classType, coreChecks.alcohol]
+  const highlight = combinedHighlight(fieldChecks)
+  const evidence = {
+    applicabilityExplanation: 'Distilled-spirits brand name, class/type designation, and alcohol content must appear in the same field of vision.',
+    applicationEvidence: fieldChecks.map((check) => `${check.label}: ${check.expected}`).join(' · '),
+    labelEvidence: fieldChecks.map((check) => `${check.label}: ${check.observed || 'Not found'} (${findingLabels[check.status]})`).join(' · '),
+  }
   if (fieldChecks.every((check) => check.status === 'pass' && check.highlight)) {
-    return card(
+    return {
+      ...card(
       rule,
       'pass',
       'Brand name, class/type, and alcohol content were located on this submitted label face.',
-      'All three required statements were located together on the same artwork face and can be inspected through their OCR highlights.',
-    )
+      'All three required statements were located together. Hovering this card highlights all three regions at once.',
+      undefined,
+      evidence,
+      ),
+      highlight,
+    }
   }
-  if (fieldChecks.some((check) => check.status === 'mismatch')) {
-    return card(
+  const mismatches = fieldChecks.filter((check) => check.status === 'mismatch')
+  const unresolved = fieldChecks.filter((check) => check.status === 'needs_review')
+  if (mismatches.length) {
+    return {
+      ...card(
       rule,
       'mismatch',
-      'One or more required statements were not matched on this label face.',
-      'SODAPOP could not establish the required shared field of vision because a mandatory statement is missing or conflicting.',
-    )
+      `Problem with: ${mismatches.map((check) => check.label).join(', ')}.`,
+      `SODAPOP could not establish the shared field of vision because ${mismatches.map((check) => `${check.label.toLowerCase()} is missing or conflicts with the application`).join('; ')}. Detected evidence remains highlighted for inspection.`,
+      undefined,
+      evidence,
+      ),
+      highlight,
+    }
   }
-  return card(
+  return {
+    ...card(
     rule,
     'needs_review',
-    'The OCR evidence does not establish all three locations.',
-    'Confirm the brand name, class/type, and alcohol content can all be viewed without turning the container.',
-  )
+    `Unresolved: ${unresolved.map((check) => check.label).join(', ') || 'statement locations'}.`,
+    `OCR could not reliably establish ${unresolved.map((check) => check.label.toLowerCase()).join(', ') || 'all three locations'}. Confirm all three statements can be viewed without turning the container.`,
+    undefined,
+    evidence,
+    ),
+    highlight,
+  }
 }
 
 function countryOriginCard(rule: RuleApplicability, application: ApplicationData, text: string) {
@@ -167,13 +212,13 @@ function countryOriginCard(rule: RuleApplicability, application: ApplicationData
     )
   }
   if (normalizeWords(detected).startsWith(normalizeWords(expected))) {
-    return card(rule, 'pass', `PRODUCT OF ${detected}`, 'The country-of-origin statement matches the imported-product packet.', [`PRODUCT OF ${expected}`])
+    return card(rule, 'pass', `PRODUCT OF ${detected}`, 'The country-of-origin statement matches the imported-product application information.', [`PRODUCT OF ${expected}`])
   }
   return card(
     rule,
     'mismatch',
     `PRODUCT OF ${detected}`,
-    `The detected country conflicts with the packet country, ${expected}.`,
+    `The detected country conflicts with the application country, ${expected}.`,
     [`PRODUCT OF ${expected}`],
   )
 }
@@ -181,26 +226,49 @@ function countryOriginCard(rule: RuleApplicability, application: ApplicationData
 function optionalInformationCard(rule: RuleApplicability, application: ApplicationData, text: string, confidence: number) {
   const claimPatterns = [
     /\bsmall batch\b/i,
-    /\b(?:aged|old)\s+(?:at least\s+)?\d+\s+(?:year|month)/i,
+    /\b(?:aged|old)\s+(?:at least\s+)?\d+\s+(?:years?|months?)/i,
     /\b(?:organic|natural|handmade|estate|reserve)\b/i,
   ]
   const claims = claimPatterns.flatMap((pattern) => text.match(pattern)?.[0] ?? [])
   if (!claims.length && confidence >= 68) {
-    return card(rule, 'pass', 'No material optional claim was detected.', 'No unsupported optional textual claim was identified in the readable OCR evidence.')
+    return card(
+      rule,
+      'pass',
+      'No material optional claim was detected.',
+      'No unsupported optional textual claim was identified in the readable OCR evidence.',
+      undefined,
+      {
+        applicabilityExplanation: 'Optional statements are checked when readable label text includes a production, quality, age, or similar claim.',
+        applicationEvidence: 'No supporting comparison was needed because no material optional claim was detected.',
+        labelEvidence: 'Readable OCR did not identify a material optional claim.',
+      },
+    )
   }
-  const facts = normalizeWords([
+  const supportingFacts = [
     application.productionFacts,
     application.formulaCompositionStatement,
     application.formulaLabelingInstructions,
     application.classType,
-  ].filter(Boolean).join(' '))
+  ].filter(Boolean).join(' · ')
+  const facts = normalizeWords(supportingFacts)
   const unsupported = claims.filter((claim) => {
     const normalizedClaim = normalizeWords(claim)
     if (/aged|old/.test(normalizedClaim) && /aged|youngest/.test(facts)) return false
     return !facts.includes(normalizedClaim)
   })
   if (!unsupported.length && claims.length) {
-    return card(rule, 'pass', claims.join(' · '), 'Detected optional claims have corresponding production support in the review packet.')
+    return card(
+      rule,
+      'pass',
+      claims.join(' · '),
+      'Each detected optional claim has corresponding support in the application or supporting information shown below.',
+      undefined,
+      {
+        applicabilityExplanation: `The label contains the optional claim${claims.length > 1 ? 's' : ''}: ${claims.join('; ')}.`,
+        applicationEvidence: supportingFacts || 'No supporting application fact was supplied.',
+        labelEvidence: claims.join(' · '),
+      },
+    )
   }
   return card(
     rule,
@@ -209,10 +277,18 @@ function optionalInformationCard(rule: RuleApplicability, application: Applicati
     unsupported.length
       ? `Supporting evidence was not found for: ${unsupported.join('; ')}. Confirm truthfulness and whether more documentation is required.`
       : 'Inspect graphics and any text OCR could not read; no automatic failure was inferred from poor image quality.',
+    undefined,
+    {
+      applicabilityExplanation: claims.length
+        ? `The label contains the optional claim${claims.length > 1 ? 's' : ''}: ${claims.join('; ')}.`
+        : 'Image quality prevented a reliable inventory of optional statements.',
+      applicationEvidence: supportingFacts || 'No supporting application fact was supplied.',
+      labelEvidence: claims.length ? claims.join(' · ') : 'Optional label text was not readable enough to inventory.',
+    },
   )
 }
 
-function ageCard(rule: RuleApplicability, application: ApplicationData, text: string, confidence: number) {
+function ageCard(rule: RuleApplicability, application: ApplicationData, text: string) {
   const facts = application.productionFacts ?? ''
   const age = facts.match(/(?:youngest(?: applicable)? spirit (?:is |was )?aged|youngest age:)\s*(\d+)\s*(years?|months?)/i)
   if (!age) return missingContextCard(rule)
@@ -224,20 +300,34 @@ function ageCard(rule: RuleApplicability, application: ApplicationData, text: st
     `AGED AT LEAST ${amount} ${unit}`,
     `AGED A MINIMUM OF ${amount} ${unit}`,
   ]
-  const matched = accepted.find((phrase) => phraseMatches(phrase, text))
-  if (matched) return {
-    ...card(rule, 'pass', matched, 'The age statement agrees with the youngest applicable spirit documented in the packet.', accepted),
+  const detected = text.match(/\b(?:aged(?:\s+at\s+least|\s+a\s+minimum\s+of)?\s+\d+\s+(?:years?|months?)|\d+\s+(?:years?|months?)\s+old)\b/i)?.[0]
+  const detectedAge = detected?.match(/(\d+)\s+(years?|months?)/i)
+  const ageMatches = Boolean(
+    detectedAge
+    && detectedAge[1] === amount
+    && detectedAge[2].toLowerCase().startsWith(unit.toLowerCase().startsWith('year') ? 'year' : 'month'),
+  )
+  const ageEvidence = {
+    applicabilityExplanation: application.requiresAgeStatement
+      ? 'The application indicates that an age statement is mandatory for this product.'
+      : 'The label or application makes an age or maturity representation, so the statement must be checked.',
+    applicationEvidence: `Youngest applicable spirit: ${amount} ${unit}.`,
+    labelEvidence: detected || 'No readable age statement was detected.',
+  }
+  if (detected && ageMatches) return {
+    ...card(rule, 'pass', detected, 'The age statement agrees with the youngest applicable spirit documented in the application or supporting information.', accepted, ageEvidence),
     requirementsLabel: 'Accepted forms — one is required',
   }
   return {
     ...card(
     rule,
-    confidence < 68 ? 'needs_review' : 'mismatch',
-    'Supporting age statement not matched',
-    confidence < 68
-      ? 'OCR could not reliably resolve the age statement. Confirm it against the youngest-spirit facts.'
-      : `No acceptable statement reflecting ${amount} ${unit} was detected.`,
+    detected ? 'mismatch' : 'needs_review',
+    detected || 'Supporting age statement not matched',
+    detected
+      ? `The detected age statement does not agree with the documented youngest applicable spirit of ${amount} ${unit}.`
+      : `OCR did not reliably resolve an age statement reflecting ${amount} ${unit}. Inspect the artwork before deciding; absence from OCR alone is not a confirmed label mismatch.`,
     accepted,
+    ageEvidence,
     ),
     requirementsLabel: 'Accepted forms — one is required',
   }
@@ -261,10 +351,34 @@ function evaluatedRuleCard(rule: RuleApplicability, input: Input): ReviewCheck {
   const { application, ocrText, ocrConfidence, coreChecks } = input
   switch (rule.rule.id) {
     case 'common.label-set-completeness':
-      return application.labelSet === true
-        ? card(rule, 'pass', application.labelDimensions || 'Complete label set supplied', 'The review packet identifies the submitted label set and provides readable artwork evidence.')
+      return application.labelSet === true && Boolean(application.labelDimensions) && application.bottleMarkings !== undefined
+        ? card(
+            rule,
+            'pass',
+            'The application identifies a complete label set and documents its dimensions and container markings.',
+            'The evidence needed to understand which label panels and container-applied markings were submitted is identified below.',
+            undefined,
+            {
+              applicabilityExplanation: 'Every review needs enough submitted label and container evidence to evaluate all mandatory information.',
+              applicationEvidence: `Label set supplied: yes · Dimensions: ${application.labelDimensions} · Container markings: ${application.bottleMarkings || 'None documented'}`,
+              labelEvidence: `Current artwork OCR confidence: ${Math.round(ocrConfidence)}%. Confirm that every submitted panel and container-applied marking is represented.`,
+            },
+          )
+        : application.labelSet === true
+          ? card(
+              rule,
+              'needs_review',
+              'The application says a label set was supplied, but its dimensions or container-marking evidence is incomplete.',
+              'Confirm the submitted panels and any container-applied markings before deciding.',
+              undefined,
+              {
+                applicabilityExplanation: 'Every review needs enough submitted label and container evidence to evaluate all mandatory information.',
+                applicationEvidence: `Label set supplied: yes · Dimensions: ${application.labelDimensions || 'Not supplied'} · Container markings: ${application.bottleMarkings ?? 'Not supplied'}`,
+                labelEvidence: `Current artwork OCR confidence: ${Math.round(ocrConfidence)}%.`,
+              },
+            )
         : application.labelSet === false
-          ? card(rule, 'mismatch', 'Application indicates an incomplete label set.', 'Required label or container evidence is absent from the packet.')
+          ? card(rule, 'mismatch', 'Application indicates an incomplete label set.', 'Required label or container evidence is absent from the submitted application information.')
           : missingContextCard(rule)
     case 'common.optional-information':
       return optionalInformationCard(rule, application, ocrText, ocrConfidence)
@@ -290,7 +404,7 @@ function evaluatedRuleCard(rule: RuleApplicability, input: Input): ReviewCheck {
       return countryOriginCard(rule, application, ocrText)
     case 'spirits.distinctive-bottle':
       return application.bottleDesignEvidence
-        ? card(rule, 'pass', application.bottleDesignEvidence, 'The requested bottle views and design evidence are documented in the packet.')
+        ? card(rule, 'pass', application.bottleDesignEvidence, 'The requested bottle views and design evidence are documented in the supporting application information.')
         : missingContextCard(rule)
     case 'spirits.specialty-composition':
       return textEvidenceCard(rule, ocrText, ocrConfidence, [application.fancifulName ?? '', application.formulaCompositionStatement ?? ''], 'The fanciful name and statement of composition match the application and approved formula.')
@@ -301,7 +415,7 @@ function evaluatedRuleCard(rule: RuleApplicability, input: Input): ReviewCheck {
     case 'spirits.neutral-spirits-commodity':
       return textEvidenceCard(rule, ocrText, ocrConfidence, application.formulaLabelingInstructions?.split('|') ?? [], 'The required neutral-spirits percentage and commodity disclosure match the formula instructions.')
     case 'spirits.age-statement':
-      return ageCard(rule, application, ocrText, ocrConfidence)
+      return ageCard(rule, application, ocrText)
     case 'spirits.wood-treatment':
       return productionDisclosure(rule, application, ocrText, ocrConfidence, 'Wood treatment disclosure', 'COLORED AND FLAVORED WITH WOOD')
     case 'spirits.state-of-distillation':

@@ -356,9 +356,7 @@ function classicLabel(variant: SampleVariant) {
     <text x="700" y="600" text-anchor="middle" font-family="Georgia, serif" font-size="96" letter-spacing="7" fill="#1e3426">DISTILLERY</text>
     <text x="700" y="745" text-anchor="middle" font-family="Arial, sans-serif" font-size="42" letter-spacing="3">KENTUCKY STRAIGHT</text>
     <text x="700" y="810" text-anchor="middle" font-family="Arial, sans-serif" font-size="52" font-weight="700">BOURBON WHISKEY</text>
-    <circle cx="700" cy="1035" r="125" fill="none" stroke="#b08a45" stroke-width="5"/>
-    <text x="700" y="1025" text-anchor="middle" font-family="Georgia, serif" font-size="44" fill="#7a5b2b">AGED</text>
-    <text x="700" y="1090" text-anchor="middle" font-family="Georgia, serif" font-size="70" font-weight="700" fill="#1e3426">4 YEARS</text>
+    <text x="700" y="1060" text-anchor="middle" font-family="Arial, sans-serif" font-size="58" font-weight="700" letter-spacing="2" fill="#1e3426">AGED 4 YEARS</text>
     <text x="115" y="1310" font-family="Arial, sans-serif" font-size="38" font-weight="700">${alcohol}</text>
     <text x="1285" y="1310" text-anchor="end" font-family="Arial, sans-serif" font-size="38" font-weight="700">750 mL</text>
     <path d="M90 1380 H1310" stroke="#273b2b" stroke-width="3"/>

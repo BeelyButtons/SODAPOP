@@ -86,6 +86,25 @@ describe('verifyLabel', () => {
     expect(outcome.status).toBe('needs_review')
   })
 
+  it('treats an unread age statement as human review instead of a confirmed mismatch', () => {
+    const outcome = review(validOcrText.replace('AGED 4 YEARS', ''))
+
+    expect(outcome.checks.find((check) => check.id === 'spirits.age-statement')).toMatchObject({
+      status: 'needs_review',
+      labelEvidence: 'No readable age statement was detected.',
+    })
+  })
+
+  it('reports a conflicting readable age statement as a mismatch', () => {
+    const outcome = review(validOcrText.replace('AGED 4 YEARS', 'AGED 6 YEARS'))
+
+    expect(outcome.checks.find((check) => check.id === 'spirits.age-statement')).toMatchObject({
+      status: 'mismatch',
+      observed: 'AGED 6 YEARS',
+      labelEvidence: 'AGED 6 YEARS',
+    })
+  })
+
   it('uses only TTB warning checks for wine below seven percent', () => {
     const outcome = verifyLabel({
       application: {
@@ -189,10 +208,12 @@ describe('verifyLabel', () => {
 
   it('attaches coordinates to each detected application value', () => {
     const wordLines = [
+      ['SMALL', 'BATCH'],
       ['OLD', 'TOM', 'DISTILLERY'],
       ['KENTUCKY', 'STRAIGHT', 'BOURBON', 'WHISKEY'],
       ['45%', 'Alc./Vol.', '(90', 'Proof)'],
       ['750', 'mL'],
+      ['AGED', '4', 'YEARS'],
     ]
     const ocrWords: OcrWord[] = wordLines.flatMap((line, lineIndex) =>
       line.map((text, wordIndex) => ({
@@ -208,7 +229,7 @@ describe('verifyLabel', () => {
     )
     const outcome = verifyLabel({
       application: INITIAL_APPLICATION,
-      ocrText: validOcrText,
+      ocrText: `SMALL BATCH\n${validOcrText}`,
       ocrConfidence: 95,
       durationMs: 1_250,
       ocrWords,
@@ -220,5 +241,17 @@ describe('verifyLabel', () => {
     expect(outcome.checks.find((check) => check.id === 'classType')?.highlight?.boxes).toHaveLength(4)
     expect(outcome.checks.find((check) => check.id === 'alcohol')?.highlight?.boxes).toHaveLength(4)
     expect(outcome.checks.find((check) => check.id === 'netContents')?.highlight?.boxes).toHaveLength(2)
+    expect(outcome.checks.find((check) => check.id === 'spirits.same-field-of-vision')?.highlight?.boxes).toHaveLength(11)
+    expect(outcome.checks.find((check) => check.id === 'spirits.age-statement')).toMatchObject({
+      status: 'pass',
+      observed: 'AGED 4 YEARS',
+      applicationEvidence: 'Youngest applicable spirit: 4 years.',
+    })
+    expect(outcome.checks.find((check) => check.id === 'spirits.age-statement')?.highlight?.boxes).toHaveLength(3)
+    expect(outcome.checks.find((check) => check.id === 'common.optional-information')).toMatchObject({
+      status: 'pass',
+      observed: 'SMALL BATCH · AGED 4 YEARS',
+    })
+    expect(outcome.checks.find((check) => check.id === 'common.optional-information')?.highlight?.boxes).toHaveLength(5)
   })
 })

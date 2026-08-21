@@ -15,10 +15,11 @@ SODAPOP — System for Optical Detection, Analysis & Packaging-Oversight Process
 - Sticky reviewer controls with OCR confidence and elapsed time: working
 - Saved 90-degree label rotation without an OCR rerun: working
 - Staff Pass/Fail determination for every reviewed item: working
+- View-gated bulk Pass for remaining green findings only: working; red and amber findings always require individual review
 - Final decision rule and submission control: working
 - Synthetic compliant, failure, varied-layout, and difficult-photo cases: included
 - Expanded-case local benchmark: 3.6–4.9 seconds on clear, conditional, blurred, and obstructed samples with a warm OCR engine
-- Coordinate-backed label highlighting: working
+- Coordinate-backed label highlighting: working, including combined regions for multiple visually detected facts used by one finding
 - Angled-label deskewing and orientation-aware highlights: working
 - Conditional glare and alternate-orientation OCR retries: working
 - URL-aware SPA views for the queue, individual cases, new-label intake, and results: working
@@ -40,10 +41,10 @@ SODAPOP — System for Optical Detection, Analysis & Packaging-Oversight Process
 5. Compares brand name, class/type, alcohol content, and net contents.
 6. Checks the government warning’s exact wording and required uppercase heading.
 7. Reports automated `Pass`, `Mismatch`, or `Human review` findings with expected and observed evidence.
-8. Highlights detected label text in green for a match, red for a confirmed issue, or amber for human review.
+8. Highlights detected label text in green for a match, red for a confirmed issue, or amber for human review; when one analysis relies on separated statements such as `SMALL BATCH` and `AGED 4 YEARS`, all relevant regions are highlighted together.
 9. Sorts mismatches and human-review findings before confident passes so staff can fail fast.
 10. Keeps decision progress, OCR confidence, elapsed time, and Pause visible in a sticky review bar.
-11. Requires staff to mark every investigated item `Pass` or `Fail` after examining the evidence.
+11. Requires staff to mark every investigated item `Pass` or `Fail` after examining the evidence; after every card has actually entered the viewport, staff may mark all remaining green findings Pass in one action while red and amber findings remain mandatory individual decisions.
 12. Allows a reviewer to confirm a failure immediately after the first failed item instead of answering irrelevant remaining questions.
 13. Confirms a passing decision after every item is marked `Pass`, without a separate final-decision section.
 14. Moves to the next queued label after the final decision and returns to an empty queue when work is complete.
@@ -57,7 +58,9 @@ SODAPOP — System for Optical Detection, Analysis & Packaging-Oversight Process
 22. Shows the applied rule set and its selection reasons in the sticky review bar; the centered rule window prioritizes applicable and missing-context rules while keeping non-applicable rules available behind an intentional disclosure.
 23. Lets staff inspect a full rule reference in a separate browser tab, override a mistaken selection, and rerun deterministic analysis from cached OCR and image evidence.
 24. Produces a staff Pass/Fail card for every applicable distilled-spirits rule instead of limiting review to the original six comparisons.
-25. Recommends Pass or Mismatch when packet and readable artwork evidence support that result; it uses Human review only when context or visible evidence is genuinely unresolved.
+25. Recommends Pass or Mismatch when application/supporting information and readable artwork evidence support that result; it uses Human review only when context or visible evidence is genuinely unresolved.
+26. Explains why selected distilled-spirits rules apply, exposes the specific application/supporting fact behind a conclusion, and identifies what the label actually showed instead of referring vaguely to a “review packet.”
+27. Highlights brand, class/type, and alcohol content together for same-field-of-vision review, names the exact unresolved field, and recognizes and highlights supported age statements such as `AGED 4 YEARS`.
 
 The application uses meaningful browser routes even though it remains a client-side SPA:
 
@@ -76,7 +79,7 @@ The included synthetic cases demonstrate a matching label, incorrect ABV, incorr
 
 ## Product direction and iterative improvement
 
-The workflow is being improved through repeated hands-on review by the project owner in collaboration with Codex. The project owner has driven the practical improvements: simplifying the opening experience, moving privacy information out of the way, making the label easier to inspect, identifying misleading sample-label behavior, requesting status-aware highlights, broadening the test-label designs, requiring an explicit staff decision instead of treating automation as approval, replacing destructive re-review with a reviewer-friendly correction and audit-history workflow, and turning both work queues into searchable tables designed for fast scanning and copy/paste work.
+The workflow is being improved through repeated hands-on review by the project owner in collaboration with Codex. The project owner has driven the practical improvements: simplifying the opening experience, moving privacy information out of the way, making the label easier to inspect, identifying misleading sample-label behavior, requesting status-aware highlights, broadening the test-label designs, requiring an explicit staff decision instead of treating automation as approval, replacing destructive re-review with a reviewer-friendly correction and audit-history workflow, turning both work queues into searchable tables designed for fast scanning and copy/paste work, requiring conclusions to expose their actual evidence, and reducing repetitive clicks without allowing red or amber findings to bypass individual staff review.
 
 That iterative review materially changed the product from a basic OCR comparison demo into a staff-centered decision-support workflow. The project owner's latest review introduced the portal, persistent queue, sequential review experience, accessible evidence hierarchy, and quick-fail path. Each improvement is evaluated against a simple principle: automation should help staff locate and understand evidence, while staff retain responsibility for the regulatory determination.
 
@@ -102,9 +105,11 @@ The project owner next required actual domestic and imported distilled-spirits c
 - Application requirements are larger and visually stronger than OCR observations, reflecting what staff must compare the artwork against.
 - Controls and evidence text are larger and higher contrast for reviewers who need more readable interfaces.
 - Pass and Fail controls use light semantic colors before selection and stronger colors after selection.
+- Fail is consistently positioned on the left and Pass on the right. A bulk-Pass control appears at the bottom only after every card has entered the viewport, and it changes only undecided green findings.
+- If bulk Pass leaves red or amber findings undecided, an explicit reminder names every remaining item and returns the reviewer to the first one; those findings can never be changed by the bulk action.
 - A Fail selection requires explicit confirmation, then records the label failure without forcing the reviewer through the remaining cards.
 - Mismatches appear first in prominent red cards, human-review findings follow in amber, and confident passes come last.
-- A sticky command bar keeps staff progress, OCR confidence, elapsed time, and Pause visible while the cards scroll.
+- A sticky command bar keeps staff progress, OCR confidence, elapsed time, and Pause visible while the cards scroll; the sticky artwork panel dynamically offsets below it so neither the image nor its active status badge is obscured.
 - The sticky compliance command bar appears before the queued-label title and description, putting the reviewer’s task and progress first without changing its scrolling behavior.
 - Compact cards bold only the checked-item name. Government-warning formatting uses a labeled, responsive requirements list instead of a dense semicolon-separated sentence.
 - Completed decisions use the same copy-friendly table pattern and are searchable by keyword or decision ID, filterable by outcome, product, source, or applied rule set, sortable by date, and stamped with the local decision date and time.

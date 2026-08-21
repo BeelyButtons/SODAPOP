@@ -60,7 +60,7 @@ describe('expanded distilled-spirits reviewer cards', () => {
 
     expect(outcome.checks.find((check) => check.id === 'spirits.country-of-origin')).toMatchObject({
       status: 'mismatch',
-      explanation: expect.stringContaining('conflicts with the packet country'),
+      explanation: expect.stringContaining('conflicts with the application country'),
     })
   })
 

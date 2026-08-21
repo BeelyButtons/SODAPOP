@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { RuleSetControl } from './RuleSetControl'
 import { reviewContextFromApplication, selectAutomaticRuleSet } from '../domain/ruleEngine'
 import type { ApplicationData, CheckStatus, ReviewCheck, ReviewOutcome } from '../domain/reviewSchema'
@@ -97,6 +97,7 @@ function CheckCard({
     <article
       className={`check-card check-status-${check.status}${interactive ? ' check-card-highlightable' : ''}${active ? ' check-card-active' : ''}`}
       aria-label={`${check.label} automated finding`}
+      data-review-check-id={check.id}
       tabIndex={interactive ? 0 : undefined}
       onClick={selectFromCard}
       onKeyDown={selectFromKeyboard}
@@ -131,6 +132,14 @@ function CheckCard({
         <strong>{humanReviewLead ? 'AI determination: Human review required.' : `AI determination: ${statusLabels[check.status]}.`}</strong> {check.explanation}
       </p>
 
+      {(check.applicabilityExplanation || check.applicationEvidence || check.labelEvidence) && (
+        <dl className="check-evidence" aria-label={`${check.label} decision evidence`}>
+          {check.applicabilityExplanation && <div><dt>Why this rule applies</dt><dd>{check.applicabilityExplanation}</dd></div>}
+          {check.applicationEvidence && <div><dt>Application / supporting information</dt><dd>{check.applicationEvidence}</dd></div>}
+          {check.labelEvidence && <div><dt>What the label shows</dt><dd>{check.labelEvidence}</dd></div>}
+        </dl>
+      )}
+
       {decisionLocked ? (
         <div className="locked-decision-row">
           <div className={`locked-decision locked-${decision ?? 'unknown'}`}>
@@ -146,20 +155,20 @@ function CheckCard({
           <legend>Staff determination</legend>
           <div>
             <button
-              className={decision === 'pass' ? 'decision-button decision-pass selected' : 'decision-button decision-pass'}
-              type="button"
-              aria-pressed={decision === 'pass'}
-              onClick={() => onDecision(check.id, 'pass')}
-            >
-              Pass
-            </button>
-            <button
               className={decision === 'fail' ? 'decision-button decision-fail selected' : 'decision-button decision-fail'}
               type="button"
               aria-pressed={decision === 'fail'}
               onClick={() => onDecision(check.id, 'fail')}
             >
               Fail
+            </button>
+            <button
+              className={decision === 'pass' ? 'decision-button decision-pass selected' : 'decision-button decision-pass'}
+              type="button"
+              aria-pressed={decision === 'pass'}
+              onClick={() => onDecision(check.id, 'pass')}
+            >
+              Pass
             </button>
           </div>
         </fieldset>
@@ -197,6 +206,7 @@ export function ReviewResults({
   const [pendingPass, setPendingPass] = useState(false)
   const [pendingAmendmentFinal, setPendingAmendmentFinal] = useState<QueueDecision | null>(null)
   const [pendingChangeId, setPendingChangeId] = useState<ReviewCheck['id'] | null>(null)
+  const [bulkReminder, setBulkReminder] = useState<{ passedCount: number, checkIds: string[] } | null>(null)
   const [amendmentTouched, setAmendmentTouched] = useState(false)
   const [submittedDecision, setSubmittedDecision] = useState<QueueDecision | null>(null)
   const [savedRotation, setSavedRotation] = useState<SavedRotation>(initialRotation)
@@ -206,6 +216,10 @@ export function ReviewResults({
   const [isPanning, setIsPanning] = useState(false)
   const dragSession = useRef<{ pointerId: number, startX: number, startY: number, panX: number, panY: number } | null>(null)
   const [naturalSize, setNaturalSize] = useState({ width: 1, height: 1 })
+  const [viewedCheckIds, setViewedCheckIds] = useState<Set<string>>(() => new Set())
+  const [commandBarOffset, setCommandBarOffset] = useState(96)
+  const resultsSectionRef = useRef<HTMLElement | null>(null)
+  const commandBarRef = useRef<HTMLDivElement | null>(null)
   const reviewApplication = result.application ?? application
   const reviewContext = reviewApplication ? reviewContextFromApplication(reviewApplication) : {}
   const ruleSelection = result.ruleSelection ?? selectAutomaticRuleSet(reviewContext)
@@ -216,11 +230,14 @@ export function ReviewResults({
       .map(({ check }) => check),
     [result.checks],
   )
+  const checkSetKey = sortedChecks.map((check) => check.id).join('|')
   const activeCheckId = previewedCheck ?? selectedCheck
   const activeCheck = result.checks.find((check) => check.id === activeCheckId)
   const highlight = activeCheck?.highlight
   const highlightStatus = activeCheck?.status
   const decidedCount = result.checks.filter((check) => staffDecisions[check.id]).length
+  const remainingGreenChecks = result.checks.filter((check) => check.status === 'pass' && !staffDecisions[check.id])
+  const allCardsViewed = result.checks.length > 0 && result.checks.every((check) => viewedCheckIds.has(check.id))
   const amendmentFinalDecision: QueueDecision | null = result.checks.some((check) => staffDecisions[check.id] === 'fail')
     ? 'fail'
     : result.checks.every((check) => staffDecisions[check.id] === 'pass')
@@ -255,6 +272,42 @@ export function ReviewResults({
       }
     : { width: '100%', height: '100%', transform: `translate(-50%, -50%) rotate(${draftRotation}deg)` }
 
+  useEffect(() => {
+    setViewedCheckIds(new Set())
+    setBulkReminder(null)
+  }, [checkSetKey])
+
+  useEffect(() => {
+    if (readOnly || amendmentCheckId || typeof IntersectionObserver === 'undefined') return
+    const cards = resultsSectionRef.current?.querySelectorAll<HTMLElement>('[data-review-check-id]') ?? []
+    const observer = new IntersectionObserver((entries) => {
+      const newlyViewed = entries
+        .filter((entry) => entry.isIntersecting)
+        .map((entry) => (entry.target as HTMLElement).dataset.reviewCheckId)
+        .filter((id): id is string => Boolean(id))
+      if (!newlyViewed.length) return
+      setViewedCheckIds((current) => {
+        if (newlyViewed.every((id) => current.has(id))) return current
+        const next = new Set(current)
+        newlyViewed.forEach((id) => next.add(id))
+        return next
+      })
+    }, { threshold: 0.2 })
+    cards.forEach((cardElement) => observer.observe(cardElement))
+    return () => observer.disconnect()
+  }, [amendmentCheckId, checkSetKey, readOnly])
+
+  useEffect(() => {
+    const commandBar = commandBarRef.current
+    if (!commandBar) return
+    const updateOffset = () => setCommandBarOffset(Math.ceil(commandBar.getBoundingClientRect().height) + 18)
+    updateOffset()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(updateOffset)
+    observer.observe(commandBar)
+    return () => observer.disconnect()
+  }, [])
+
   function selectCheck(id: ReviewCheck['id']) {
     setSelectedCheck((current) => (current === id ? null : id))
   }
@@ -279,7 +332,32 @@ export function ReviewResults({
     setSubmittedDecision(null)
     setSelectedCheck(null)
     setPreviewedCheck(null)
+    setViewedCheckIds(new Set())
+    setBulkReminder(null)
     onRuleSetOverride?.(ruleSetId)
+  }
+
+  function passRemainingGreenChecks() {
+    const next = { ...staffDecisions }
+    remainingGreenChecks.forEach((check) => { next[check.id] = 'pass' })
+    const individuallyRequired = result.checks.filter((check) => (
+      check.status !== 'pass' && !next[check.id]
+    ))
+    setStaffDecisions(next)
+    setSubmittedDecision(null)
+    setBulkReminder(individuallyRequired.length
+      ? { passedCount: remainingGreenChecks.length, checkIds: individuallyRequired.map((check) => check.id) }
+      : null)
+    if (result.checks.every((check) => next[check.id] === 'pass')) setPendingPass(true)
+  }
+
+  function continueRequiredReview() {
+    const firstId = bulkReminder?.checkIds[0]
+    setBulkReminder(null)
+    if (!firstId) return
+    const card = [...(resultsSectionRef.current?.querySelectorAll<HTMLElement>('[data-review-check-id]') ?? [])]
+      .find((element) => element.dataset.reviewCheckId === firstId)
+    card?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
   function submit(decision: QueueDecision, decisions: StaffDecisions) {
@@ -359,8 +437,13 @@ export function ReviewResults({
   const dialogDecision = pendingFail ? 'fail' : pendingPass ? 'pass' : pendingAmendmentFinal
 
   return (
-    <section className="results-section" aria-labelledby="results-title">
-      <div className="review-command-bar">
+    <section
+      className="results-section"
+      aria-labelledby="results-title"
+      ref={resultsSectionRef}
+      style={{ '--review-command-offset': `${commandBarOffset}px` } as CSSProperties}
+    >
+      <div className="review-command-bar" ref={commandBarRef}>
         <div>
           <h2 id="results-title">{readOnly ? 'Completed label decision' : amendmentCheckId ? 'Update this label compliance determination' : 'Make your label compliance determination'}</h2>
           <strong>{readOnly ? `Final decision: ${recordedDecision === 'pass' ? 'Pass' : 'Fail'}` : `${decidedCount} of ${result.checks.length} decided${amendmentCheckId ? ' · previous answers preserved' : ''}`}</strong>
@@ -482,6 +565,17 @@ export function ReviewResults({
               />
             ))}
           </div>
+          {!readOnly && !amendmentCheckId && allCardsViewed && remainingGreenChecks.length > 0 && (
+            <section className="pass-remaining-panel" aria-label="Pass remaining green findings">
+              <div>
+                <strong>All review cards viewed</strong>
+                <span>Only the {remainingGreenChecks.length} remaining green {remainingGreenChecks.length === 1 ? 'item' : 'items'} will be marked Pass. Red and amber items still require individual decisions.</span>
+              </div>
+              <button className="pass-remaining-button" type="button" onClick={passRemainingGreenChecks}>
+                Pass all remaining green {remainingGreenChecks.length === 1 ? 'item' : 'items'}
+              </button>
+            </section>
+          )}
           <details className="ocr-details"><summary>View raw OCR text</summary><pre>{result.ocrText || 'No text was extracted.'}</pre></details>
         </div>
       </div>
@@ -504,6 +598,23 @@ export function ReviewResults({
 
       {submittedDecision && !onFinalDecision && (
         <p className={`decision-recorded-banner decision-${submittedDecision}`} role="status">Final {submittedDecision === 'pass' ? 'Pass' : 'Fail'} decision recorded for this browser session.</p>
+      )}
+
+      {bulkReminder && (
+        <div className="quick-fail-backdrop" role="presentation">
+          <section className="quick-fail-dialog bulk-reminder-dialog" role="alertdialog" aria-modal="true" aria-labelledby="bulk-reminder-title">
+            <span className="quick-fail-icon" aria-hidden="true">!</span>
+            <p className="eyebrow">Individual review still required</p>
+            <h2 id="bulk-reminder-title">Review the remaining red and amber items</h2>
+            <p>{bulkReminder.passedCount} green {bulkReminder.passedCount === 1 ? 'item was' : 'items were'} marked Pass. The following findings were not changed and must each be marked Pass or Fail before this label can receive a final Pass:</p>
+            <ul>
+              {bulkReminder.checkIds.map((id) => <li key={id}>{result.checks.find((check) => check.id === id)?.label ?? id}</li>)}
+            </ul>
+            <div>
+              <button className="primary-button" type="button" onClick={continueRequiredReview} autoFocus>Review remaining items</button>
+            </div>
+          </section>
+        </div>
       )}
 
       {pendingChangeId && (

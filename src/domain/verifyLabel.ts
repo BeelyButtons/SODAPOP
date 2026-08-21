@@ -386,9 +386,21 @@ export function verifyLabel(input: VerificationInput): ReviewOutcome {
   const netContentsCheck = volumeCheck(input.application.netContents, input.ocrText)
 
   const withDetectedHighlight = (check: ReviewCheck): ReviewCheck => {
+    if (check.highlight) return check
     if (/not found|not confidently found/i.test(check.observed)) return check
-    const highlight = findTextRegion(words, check.observed, imageWidth, imageHeight)
-    return highlight ? { ...check, highlight } : check
+    const regions = check.observed
+      .split(/\s*·\s*/)
+      .map((phrase) => findTextRegion(words, phrase, imageWidth, imageHeight))
+      .filter((region): region is HighlightRegion => Boolean(region))
+    if (!regions.length) return check
+    return {
+      ...check,
+      highlight: {
+        imageWidth,
+        imageHeight,
+        boxes: regions.flatMap((region) => region.boxes),
+      },
+    }
   }
 
   const ruleSelection = input.ruleSelection ?? selectAutomaticRuleSet(

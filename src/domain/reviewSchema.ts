@@ -125,6 +125,9 @@ export type ReviewCheck = {
   requirementsLabel?: string
   observed: string
   explanation: string
+  applicabilityExplanation?: string
+  applicationEvidence?: string
+  labelEvidence?: string
   highlight?: HighlightRegion
 }
 
