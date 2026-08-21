@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties, type KeyboardEvent, type MouseEvent } from 'react'
+import { useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import type { CheckStatus, ReviewCheck, ReviewOutcome } from '../domain/reviewSchema'
 import type { QueueDecision, SavedRotation, StaffDecisions } from '../reviewQueue'
 
@@ -9,6 +9,25 @@ const statusLabels: Record<CheckStatus, string> = {
 }
 
 const statusPriority: Record<CheckStatus, number> = { mismatch: 0, needs_review: 1, pass: 2 }
+const MIN_ZOOM = 50
+const MAX_ZOOM = 200
+const ZOOM_STEP = 10
+
+function requirementsFor(check: ReviewCheck) {
+  if (check.id !== 'warningFormat') return undefined
+  if (check.requirements?.length) return check.requirements
+
+  const minimumTypeSize = check.expected.match(/at least ([\d.]+) mm/i)?.[1]
+  const maximumDensity = check.expected.match(/no more than ([\d.]+) characters per inch/i)?.[1]
+  return [
+    '“GOVERNMENT WARNING” is uppercase and bold',
+    'Text following the heading is not bold',
+    minimumTypeSize ? `Minimum type size: ${minimumTypeSize} mm` : 'Confirm the applicable minimum type size',
+    maximumDensity ? `Maximum density: ${maximumDensity} characters per inch` : 'Confirm the applicable maximum character density',
+    'Text contrasts with its background',
+    'Warning is separated from other information',
+  ]
+}
 
 type Props = {
   result: ReviewOutcome
@@ -23,6 +42,11 @@ type Props = {
   onPause?: () => void
   pauseLabel?: string
   onChangeDecision?: (id: ReviewCheck['id']) => void
+  pageContext?: {
+    eyebrow: string
+    title: string
+    description?: string
+  }
 }
 
 function CheckCard({
@@ -51,6 +75,7 @@ function CheckCard({
   const interactive = Boolean(check.highlight)
   const decisionLocked = readOnly || Boolean(amendmentCheckId && decision && check.id !== amendmentCheckId)
   const humanReviewLead = check.id === 'warningFormat' && check.status === 'needs_review'
+  const requirements = requirementsFor(check)
 
   function selectFromCard(event: MouseEvent<HTMLElement>) {
     if (!interactive || (event.target as HTMLElement).closest('button')) return
@@ -80,13 +105,25 @@ function CheckCard({
           <span className={`status-icon status-${check.status}`} aria-hidden="true">
             {check.status === 'pass' ? '✓' : check.status === 'mismatch' ? '×' : '?'}
           </span>
-          <h3><span>{check.label}:</span> <span className="check-requirement">{check.expected}</span></h3>
+          <h3>
+            <span>{check.label}{requirements ? '' : ':'}</span>
+            {!requirements && <> <span className="check-requirement">{check.expected}</span></>}
+          </h3>
         </div>
         <span className={`status-badge status-${check.status}`}>{statusLabels[check.status]}</span>
       </div>
 
+      {requirements && (
+        <section className="warning-format-requirements" aria-label="Government warning format requirements">
+          <strong>Requirements to verify</strong>
+          <ul>
+            {requirements.map((requirement) => <li key={requirement}>{requirement}</li>)}
+          </ul>
+        </section>
+      )}
+
       <p className="check-explanation">
-        <strong>{humanReviewLead ? 'AI determination: Human review required — not an automated failure.' : `AI determination: ${statusLabels[check.status]}.`}</strong> {check.explanation}
+        <strong>{humanReviewLead ? 'AI determination: Human review required.' : `AI determination: ${statusLabels[check.status]}.`}</strong> {check.explanation}
       </p>
 
       {decisionLocked ? (
@@ -95,7 +132,7 @@ function CheckCard({
             <span>Staff determination</span>
             <strong>{decision ? (decision === 'pass' ? 'Pass' : 'Fail') : recordedDecision === 'fail' ? 'Not required after confirmed failure' : 'Not recorded'}</strong>
           </div>
-          {readOnly && onChangeDecision && (
+          {readOnly && decision && onChangeDecision && (
             <button className="change-decision-button" type="button" onClick={() => onChangeDecision(check.id)}>Change decision</button>
           )}
         </div>
@@ -143,6 +180,7 @@ export function ReviewResults({
   onPause,
   pauseLabel = 'Pause review',
   onChangeDecision,
+  pageContext,
 }: Props) {
   const [previewedCheck, setPreviewedCheck] = useState<ReviewCheck['id'] | null>(null)
   const [selectedCheck, setSelectedCheck] = useState<ReviewCheck['id'] | null>(null)
@@ -155,6 +193,10 @@ export function ReviewResults({
   const [submittedDecision, setSubmittedDecision] = useState<QueueDecision | null>(null)
   const [savedRotation, setSavedRotation] = useState<SavedRotation>(initialRotation)
   const [draftRotation, setDraftRotation] = useState<SavedRotation>(initialRotation)
+  const [zoom, setZoom] = useState(100)
+  const [pan, setPan] = useState({ x: 0, y: 0 })
+  const [isPanning, setIsPanning] = useState(false)
+  const dragSession = useRef<{ pointerId: number, startX: number, startY: number, panX: number, panY: number } | null>(null)
   const [naturalSize, setNaturalSize] = useState({ width: 1, height: 1 })
 
   const sortedChecks = useMemo(
@@ -180,6 +222,20 @@ export function ReviewResults({
   const stageWidth = quarterTurn ? sourceHeight : sourceWidth
   const stageHeight = quarterTurn ? sourceWidth : sourceHeight
   const stageStyle: CSSProperties = { aspectRatio: `${stageWidth} / ${stageHeight}` }
+  const highlightBounds = highlight?.boxes.reduce(
+    (bounds, box) => ({
+      x0: Math.min(bounds.x0, box.x0),
+      y0: Math.min(bounds.y0, box.y0),
+      x1: Math.max(bounds.x1, box.x1),
+      y1: Math.max(bounds.y1, box.y1),
+    }),
+    { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity },
+  )
+  const zoomOrigin = highlight && highlightBounds
+    ? `${((highlightBounds.x0 + highlightBounds.x1) / 2 / highlight.imageWidth) * 100}% ${((highlightBounds.y0 + highlightBounds.y1) / 2 / highlight.imageHeight) * 100}%`
+    : '50% 50%'
+  const zoomCanvasStyle: CSSProperties = { transform: `scale(${zoom / 100})`, transformOrigin: zoomOrigin }
+  const panCanvasStyle: CSSProperties = { transform: `translate3d(${pan.x}px, ${pan.y}px, 0)` }
   const canvasStyle: CSSProperties = quarterTurn
     ? {
         width: `${(sourceWidth / sourceHeight) * 100}%`,
@@ -237,6 +293,47 @@ export function ReviewResults({
     setSavedRotation(draftRotation)
   }
 
+  function changeZoom(delta: number) {
+    setZoom((current) => {
+      const next = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, current + delta))
+      if (next <= 100) setPan({ x: 0, y: 0 })
+      return next
+    })
+  }
+
+  function resetZoom() {
+    setZoom(100)
+    setPan({ x: 0, y: 0 })
+  }
+
+  function startPan(event: ReactPointerEvent<HTMLDivElement>) {
+    if (zoom <= 100 || event.button !== 0) return
+    event.preventDefault()
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+    dragSession.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      panX: pan.x,
+      panY: pan.y,
+    }
+    setIsPanning(true)
+  }
+
+  function movePan(event: ReactPointerEvent<HTMLDivElement>) {
+    const drag = dragSession.current
+    if (!drag || drag.pointerId !== event.pointerId) return
+    event.preventDefault()
+    setPan({ x: drag.panX + event.clientX - drag.startX, y: drag.panY + event.clientY - drag.startY })
+  }
+
+  function stopPan(event: ReactPointerEvent<HTMLDivElement>) {
+    if (dragSession.current?.pointerId !== event.pointerId) return
+    dragSession.current = null
+    setIsPanning(false)
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+  }
+
   const dialogDecision = pendingFail ? 'fail' : pendingPass ? 'pass' : pendingAmendmentFinal
 
   return (
@@ -255,6 +352,16 @@ export function ReviewResults({
         {!readOnly && onPause && <button className="secondary-button" type="button" onClick={onPause}>{pauseLabel}</button>}
       </div>
 
+      {pageContext && (
+        <div className="results-page-heading queue-review-heading results-context-heading">
+          <div>
+            <p className="eyebrow">{pageContext.eyebrow}</p>
+            <h1>{pageContext.title}</h1>
+            {pageContext.description && <p>{pageContext.description}</p>}
+          </div>
+        </div>
+      )}
+
       <div className="results-comparison">
         <figure className="results-preview" aria-label="Label artwork with OCR highlight">
           <div className="results-preview-heading">
@@ -262,36 +369,70 @@ export function ReviewResults({
             {highlight && <span className={`highlight-key highlight-${highlightStatus}`}><i /> {statusLabels[highlightStatus!]}</span>}
           </div>
 
-          {!readOnly && (
-            <div className="rotation-controls" aria-label="Label orientation controls">
-              <button type="button" onClick={() => rotate(-90)} aria-label="Rotate 90 degrees counterclockwise">↶ 90°</button>
-              <button type="button" onClick={() => rotate(90)} aria-label="Rotate 90 degrees clockwise">90° ↷</button>
-              <button type="button" className="save-rotation" disabled={draftRotation === savedRotation} onClick={saveRotation}>Save orientation</button>
-              {draftRotation !== savedRotation && <button type="button" onClick={() => setDraftRotation(savedRotation)}>Cancel</button>}
-            </div>
-          )}
+          <div className="preview-controls">
+            {!readOnly && (
+              <div className="rotation-controls" aria-label="Label orientation controls">
+                <button type="button" onClick={() => rotate(-90)} aria-label="Rotate 90 degrees counterclockwise">↶ 90°</button>
+                <button type="button" onClick={() => rotate(90)} aria-label="Rotate 90 degrees clockwise">90° ↷</button>
+                <button type="button" className="save-rotation" disabled={draftRotation === savedRotation} onClick={saveRotation}>Save orientation</button>
+                {draftRotation !== savedRotation && <button type="button" onClick={() => setDraftRotation(savedRotation)}>Cancel</button>}
+              </div>
+            )}
 
-          <div className="results-preview-frame rotation-stage" id="results-label-preview" style={stageStyle}>
-            <div className="rotation-canvas" style={canvasStyle}>
-              <img
-                src={previewUrl}
-                alt="Alcohol label used for this review"
-                onLoad={(event) => setNaturalSize({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight })}
-              />
-              {highlight && (
-                <svg className="ocr-highlight-layer" viewBox={`0 0 ${highlight.imageWidth} ${highlight.imageHeight}`} aria-hidden="true" preserveAspectRatio="none">
-                  {highlight.boxes.map((box, index) => {
-                    const points = box.points ?? [
-                      { x: box.x0, y: box.y0 }, { x: box.x1, y: box.y0 },
-                      { x: box.x1, y: box.y1 }, { x: box.x0, y: box.y1 },
-                    ]
-                    return <polygon className={`ocr-highlight-box highlight-${highlightStatus}`} key={`${box.x0}-${box.y0}-${index}`} points={points.map((point) => `${point.x},${point.y}`).join(' ')} />
-                  })}
-                </svg>
-              )}
+            <div className="zoom-controls" aria-label="Label zoom controls">
+              <button
+                type="button"
+                disabled={zoom === MIN_ZOOM}
+                onClick={() => changeZoom(-ZOOM_STEP)}
+                aria-label="Zoom out"
+              >−</button>
+              <button type="button" className="zoom-level" disabled={zoom === 100} onClick={resetZoom} aria-label={`Reset zoom to 100 percent; current zoom ${zoom} percent`}>
+                {zoom}%
+              </button>
+              <button
+                type="button"
+                disabled={zoom === MAX_ZOOM}
+                onClick={() => changeZoom(ZOOM_STEP)}
+                aria-label="Zoom in"
+              >+</button>
             </div>
           </div>
-          <figcaption title={fileName}>{fileName} · {draftRotation}° orientation</figcaption>
+
+          <div
+            className={`results-preview-frame rotation-stage${zoom > 100 ? ' can-pan' : ''}${isPanning ? ' is-panning' : ''}`}
+            id="results-label-preview"
+            style={stageStyle}
+            onPointerDown={startPan}
+            onPointerMove={movePan}
+            onPointerUp={stopPan}
+            onPointerCancel={stopPan}
+            onLostPointerCapture={stopPan}
+          >
+            <div className="pan-canvas" style={panCanvasStyle}>
+              <div className="rotation-canvas" style={canvasStyle}>
+                <div className="zoom-canvas" style={zoomCanvasStyle}>
+                  <img
+                    src={previewUrl}
+                    alt="Alcohol label used for this review"
+                    draggable="false"
+                    onLoad={(event) => setNaturalSize({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight })}
+                  />
+                  {highlight && (
+                    <svg className="ocr-highlight-layer" viewBox={`0 0 ${highlight.imageWidth} ${highlight.imageHeight}`} aria-hidden="true" preserveAspectRatio="none">
+                      {highlight.boxes.map((box, index) => {
+                        const points = box.points ?? [
+                          { x: box.x0, y: box.y0 }, { x: box.x1, y: box.y0 },
+                          { x: box.x1, y: box.y1 }, { x: box.x0, y: box.y1 },
+                        ]
+                        return <polygon className={`ocr-highlight-box highlight-${highlightStatus}`} key={`${box.x0}-${box.y0}-${index}`} points={points.map((point) => `${point.x},${point.y}`).join(' ')} />
+                      })}
+                    </svg>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+          <figcaption title={fileName}>{fileName} · {draftRotation}° orientation · {zoom}% zoom</figcaption>
         </figure>
 
         <div>

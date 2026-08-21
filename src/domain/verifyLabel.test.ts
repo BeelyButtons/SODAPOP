@@ -77,6 +77,10 @@ describe('verifyLabel', () => {
 
     expect(outcome.checks.filter((check) => check.status === 'pass')).toHaveLength(5)
     expect(outcome.checks.find((check) => check.id === 'warningFormat')?.status).toBe('needs_review')
+    expect(outcome.checks.find((check) => check.id === 'warningFormat')?.requirements).toEqual(expect.arrayContaining([
+      'Minimum type size: 2 mm',
+      'Maximum density: 25 characters per inch',
+    ]))
     expect(outcome.status).toBe('needs_review')
   })
 

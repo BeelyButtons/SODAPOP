@@ -60,6 +60,7 @@ export type ReviewCheck = {
   label: string
   status: CheckStatus
   expected: string
+  requirements?: string[]
   observed: string
   explanation: string
   highlight?: HighlightRegion

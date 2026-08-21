@@ -515,7 +515,7 @@ function App() {
           </form>
         </section>}
 
-        {activeQueueSample && (
+        {activeQueueSample && !result && (
           <div className="results-page-heading queue-review-heading">
             <div>
               <p className="eyebrow">Queued label review</p>
@@ -542,6 +542,11 @@ function App() {
             fileName={file.name}
             onFinalDecision={completeQueueCase}
             onPause={pauseQueue}
+            pageContext={{
+              eyebrow: 'Queued label review',
+              title: activeQueueSample.name,
+              description: activeQueueSample.description,
+            }}
           />
         )}
 

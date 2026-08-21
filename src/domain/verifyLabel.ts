@@ -330,6 +330,14 @@ function warningChecks(
       label: 'Government warning format',
       status: formatStatus,
       expected: `Uppercase bold heading; remaining text not bold; at least ${minimumTypeSize} mm type and no more than ${maximumCharactersPerInch} characters per inch; contrasting background and separation from other information.`,
+      requirements: [
+        '“GOVERNMENT WARNING” is uppercase and bold',
+        'Text following the heading is not bold',
+        `Minimum type size: ${minimumTypeSize} mm`,
+        `Maximum density: ${maximumCharactersPerInch} characters per inch`,
+        'Text contrasts with its background',
+        'Warning is separated from other information',
+      ],
       observed: improperBoldBody
         ? 'Body text immediately following the heading appears bold.'
         : uppercaseHeading

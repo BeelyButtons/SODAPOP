@@ -46,7 +46,8 @@ SODAPOP — System for Optical Detection, Analysis & Packaging-Oversight Process
 16. Gives every submitted decision a unique ID and preserves earlier revisions instead of overwriting them.
 17. Lets staff change an individual card decision while retaining prior answers and requiring a newly submitted final determination.
 18. Rotates any label preview in 90-degree steps while keeping OCR highlights aligned, without rerunning OCR for a display-only change.
-19. Measures processing time against the five-second usability target.
+19. Zooms label artwork from 50% to 200% in 10% increments around the active evidence, then supports click-and-drag or touch panning while scaling and moving the image and OCR highlight layer together.
+20. Measures processing time against the five-second usability target.
 
 The application uses meaningful browser routes even though it remains a client-side SPA:
 
@@ -82,11 +83,12 @@ That iterative review materially changed the product from a basic OCR comparison
 - A Fail selection requires explicit confirmation, then records the label failure without forcing the reviewer through the remaining cards.
 - Mismatches appear first in prominent red cards, human-review findings follow in amber, and confident passes come last.
 - A sticky command bar keeps staff progress, OCR confidence, elapsed time, and Pause visible while the cards scroll.
-- Compact cards bold only the checked-item name, leaving the application entry or requirement at normal weight for easier reading.
+- The sticky compliance command bar appears before the queued-label title and description, putting the reviewer’s task and progress first without changing its scrolling behavior.
+- Compact cards bold only the checked-item name. Government-warning formatting uses a labeled, responsive requirements list instead of a dense semicolon-separated sentence.
 - Completed decisions are searchable by keyword or decision ID, filterable by outcome, sortable by date, and stamped with the local decision date and time.
-- Completed cards are locked against accidental edits. A confirmed `Change decision` action unlocks only the selected decision and any unanswered quick-fail cards; previously answered cards remain preserved.
+- Completed cards are locked against accidental edits. `Change decision` appears only when staff actually recorded Pass or Fail; cards skipped after Quick Fail have no decision to change. A confirmed change preserves earlier answers and makes unanswered cards available only when they are needed to reach a new final determination.
 - Every correction creates a uniquely addressed revision. Earlier decisions remain available in the on-screen history instead of being overwritten.
-- Label artwork can be rotated clockwise or counterclockwise and saved at 90-degree intervals. The image and highlight layer rotate together, avoiding an unnecessary OCR rerun and protecting the five-second budget.
+- Label artwork uses one compact control row for orientation and zoom. It can be rotated clockwise or counterclockwise and saved at 90-degree intervals, or zoomed from 50% to 200% in 10% steps around active evidence. Above 100%, staff can click and drag (or drag by touch) to inspect any part of the artwork without persistent helper text consuming preview space. The image and highlight layer transform and move together, avoiding an unnecessary OCR rerun, keeping hover evidence aligned and visible, and protecting the five-second budget.
 
 ### Recent OCR reliability improvements
 
@@ -148,7 +150,7 @@ The automated rule checks:
 - Required uppercase `GOVERNMENT WARNING` heading
 - Container-based type-size and characters-per-inch requirement presented to the reviewer
 
-The app compares detected ink density within the warning to flag a clear case where body text appears materially bolder than surrounding body lines. It still returns `Human review` for uncertain weight, physical type size, contrast, and separation when they cannot be proven from a raster image. The interface explicitly describes this state as human review rather than an automated failure. A photograph has no reliable physical scale, and OCR-based weight detection remains an aid rather than conclusive physical measurement.
+The app compares detected ink density within the warning to flag a clear case where body text appears materially bolder than surrounding body lines. It still returns `Human review` for uncertain weight, physical type size, contrast, and separation when they cannot be proven from a raster image. The applicable requirements are presented as six reviewer-friendly checks, with container-dependent type size and character-density values calculated for the current label. A photograph has no reliable physical scale, and OCR-based weight detection remains an aid rather than conclusive physical measurement.
 
 ## Security, privacy, and retention
 
