@@ -24,6 +24,7 @@ import {
   type RuleSetSelection,
 } from './ruleEngine'
 import { distilledSpiritsChecks } from './distilledSpiritsChecks'
+import { wineChecks } from './wineChecks'
 
 type VerificationInput = {
   application: ApplicationData
@@ -441,8 +442,14 @@ export function verifyLabel(input: VerificationInput): ReviewOutcome {
         ruleSetId: selectedRuleSetId,
         coreChecks,
       }).map(withDetectedHighlight)
-    : selectedRuleSetId === 'wine-under-7-ttb-routing'
-    ? fullChecks.filter((check) => check.id === 'warningText' || check.id === 'warningFormat')
+    : selectedRuleSetId === 'wine-7plus-domestic' || selectedRuleSetId === 'wine-7plus-imported' || selectedRuleSetId === 'wine-under-7-ttb-routing'
+      ? wineChecks({
+          application: input.application,
+          ocrText: input.ocrText,
+          ocrConfidence: input.ocrConfidence,
+          ruleSetId: selectedRuleSetId,
+          coreChecks,
+        }).map(withDetectedHighlight)
     : fullChecks
 
   const status: CheckStatus = checks.some((check) => check.status === 'mismatch')

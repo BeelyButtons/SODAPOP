@@ -105,7 +105,7 @@ describe('verifyLabel', () => {
     })
   })
 
-  it('uses only TTB warning checks for wine below seven percent', () => {
+  it('routes wine below seven percent to applicable TTB Parts 16 and 24 checks without Part 4', () => {
     const outcome = verifyLabel({
       application: {
         ...INITIAL_APPLICATION,
@@ -118,7 +118,16 @@ describe('verifyLabel', () => {
     })
 
     expect(outcome.ruleSelection?.selectedRuleSetId).toBe('wine-under-7-ttb-routing')
-    expect(outcome.checks.map((check) => check.id)).toEqual(['warningText', 'warningFormat'])
+    expect(outcome.checks.map((check) => check.id)).toEqual([
+      'wine.under-seven-routing',
+      'wine.under-seven-name-address',
+      'wine.under-seven-brand-name',
+      'wine.under-seven-alcohol-content',
+      'wine.under-seven-net-contents',
+      'wine.under-seven-kind-designation',
+      'common.health-warning-wording',
+      'common.health-warning-format',
+    ])
   })
 
   it('treats harmless brand capitalization as a match', () => {

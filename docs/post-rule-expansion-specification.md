@@ -1,8 +1,8 @@
 # SODAPOP post-rule-expansion specification
 
-Status: **Approved; routing foundation and distilled-spirits card expansion implemented. Wine and malt-beverage cards remain pending.**
+Status: **Approved; routing foundation plus distilled-spirits and wine card expansions implemented. Malt-beverage cards remain pending.**
 
-This specification converts the approved TTB rule-family catalog into machine-readable records. Its records now drive the routing foundation, rule-set transparency, and expanded domestic/imported distilled-spirits reviewer cards.
+This specification converts the approved TTB rule-family catalog into machine-readable records. Its records now drive the routing foundation, rule-set transparency, and expanded domestic/imported distilled-spirits and wine reviewer cards.
 
 ## Scope and authority
 
@@ -149,4 +149,6 @@ The static rule records are small and may ship with the application. Lazy behavi
 4. Completed — domestic/imported distilled-spirits checks and regression cases without changing the staff decision rule.
 5. Completed — sticky rule-set control, detail dialog, full reference route, override, and cached reanalysis.
 6. In continuous validation — five-second budget on clear and difficult images.
-7. Pending — wine and malt rule engines in reviewed increments.
+7. Completed — domestic/imported wine engines at 7% alcohol or more, including conditional appellation, varietal, vintage, estate, formula, sulfite, color-additive, origin, and foreign-blend rules.
+8. Completed — the domestic below-7% TTB branch, including applicable Part 24 label information and the Part 16 health warning without implementing FDA rules.
+9. Pending — malt-beverage rule engine in reviewed increments.

@@ -24,6 +24,17 @@ type SampleVariant =
   | 'production-disclosures'
   | 'significant-solids'
   | 'exemption-distinctive'
+  | 'wine-domestic-complete'
+  | 'wine-varietal-support-conflict'
+  | 'wine-estate-complete'
+  | 'wine-imported-complete'
+  | 'wine-imported-origin-conflict'
+  | 'wine-formula-complete'
+  | 'wine-formula-missing'
+  | 'wine-formula-conflict'
+  | 'wine-under-seven-complete'
+  | 'wine-under-seven-missing'
+  | 'wine-glare-photo'
 
 export type SampleLabel = {
   id: SampleVariant
@@ -195,6 +206,130 @@ const EXEMPTION_DISTINCTIVE_APPLICATION: ApplicationData = {
   productionFacts: 'Domestic vodka for intrastate Virginia sale; distinctive bottle packet complete.',
 }
 
+const DOMESTIC_WINE_APPLICATION: ApplicationData = {
+  ...INITIAL_APPLICATION,
+  productType: 'wine',
+  source: 'domestic',
+  brandName: 'RIDGE & RIVER',
+  classType: 'CABERNET SAUVIGNON',
+  alcoholContent: '13.5% Alc. by Vol.',
+  netContents: '750 mL',
+  applicantName: 'RIDGE & RIVER WINERY',
+  applicantAddress: 'ST. HELENA, CALIFORNIA',
+  permitName: 'RIDGE & RIVER WINERY',
+  permitAddress: 'ST. HELENA, CALIFORNIA',
+  formulaRequired: false,
+  labelDimensions: 'Complete single brand-label face; 4 × 6 inches',
+  sulfitesPpm: 18,
+  wineAppellation: 'NAPA VALLEY',
+  wineAppellationType: 'ava',
+  wineAppellationPercentage: 90,
+  wineFinishedInRequiredArea: true,
+  wineVarietals: [{ name: 'CABERNET SAUVIGNON', percentage: 80 }],
+  wineVintage: '2023',
+  wineVintagePercentage: 96,
+  wineEstateBottledClaim: false,
+  wineForeignBlendReferenced: false,
+  productionFacts: 'Napa Valley origin, Cabernet Sauvignon percentage, 2023 harvest, and California finishing records verified.',
+}
+
+const WINE_VARIETAL_CONFLICT_APPLICATION: ApplicationData = {
+  ...DOMESTIC_WINE_APPLICATION,
+  wineVarietals: [{ name: 'CABERNET SAUVIGNON', percentage: 60 }],
+  productionFacts: 'Only 60 percent Cabernet Sauvignon documented; remaining wine is other red varieties.',
+}
+
+const ESTATE_WINE_APPLICATION: ApplicationData = {
+  ...DOMESTIC_WINE_APPLICATION,
+  brandName: 'STONE ARBOR',
+  classType: 'CHARDONNAY',
+  alcoholContent: '12.8% Alc. by Vol.',
+  applicantName: 'STONE ARBOR ESTATE',
+  applicantAddress: 'SONOMA, CALIFORNIA',
+  permitName: 'STONE ARBOR ESTATE',
+  permitAddress: 'SONOMA, CALIFORNIA',
+  sulfitesPpm: 16,
+  wineAppellation: 'SONOMA VALLEY',
+  wineAppellationPercentage: 100,
+  wineVarietals: [{ name: 'CHARDONNAY', percentage: 85 }],
+  wineVintage: '',
+  wineVintagePercentage: undefined,
+  wineEstateBottledClaim: true,
+  wineEstateProductionContinuous: true,
+  productionFacts: 'Estate bottled. One hundred percent estate grapes; crush, fermentation, finishing, aging, processing, and bottling remained on the estate premises.',
+}
+
+const IMPORTED_WINE_APPLICATION: ApplicationData = {
+  ...DOMESTIC_WINE_APPLICATION,
+  source: 'imported',
+  brandName: 'MONTCLAIRE',
+  classType: 'RED WINE',
+  alcoholContent: '13% Alc. by Vol.',
+  netContents: '750 mL',
+  applicantName: 'ATLANTIC CELLARS IMPORTS',
+  applicantAddress: 'NEWARK, NEW JERSEY',
+  permitName: 'ATLANTIC CELLARS IMPORTS',
+  permitAddress: 'NEWARK, NEW JERSEY',
+  importCountryOfOrigin: 'FRANCE',
+  importBottlingDisposition: 'Bottled in country of origin',
+  wineAppellation: 'BORDEAUX',
+  wineAppellationType: 'foreign_viticultural_area',
+  wineAppellationPercentage: 88,
+  wineFinishedInRequiredArea: undefined,
+  wineVarietals: [],
+  wineVintage: '2022',
+  wineVintagePercentage: 96,
+  wineForeignLawCompliant: true,
+  productionFacts: 'Bordeaux origin and 2022 vintage eligibility verified under French requirements.',
+}
+
+const FORMULA_WINE_APPLICATION: ApplicationData = {
+  ...DOMESTIC_WINE_APPLICATION,
+  brandName: 'ORCHARD BLOOM',
+  classType: 'WINE SPECIALTY',
+  alcoholContent: '11% Alc. by Vol.',
+  formulaRequired: true,
+  formulaId: 'W-2026-1407',
+  formulaClassType: 'WINE SPECIALTY',
+  formulaCompositionStatement: 'APPLE WINE WITH NATURAL CHERRY FLAVOR',
+  formulaLabelingInstructions: 'APPLE WINE WITH NATURAL CHERRY FLAVOR|CONTAINS FD&C YELLOW NO. 5|CONTAINS SULFITES|CONTAINS CARMINE',
+  applicantName: 'ORCHARD BLOOM WINERY',
+  applicantAddress: 'ITHACA, NEW YORK',
+  permitName: 'ORCHARD BLOOM WINERY',
+  permitAddress: 'ITHACA, NEW YORK',
+  containsYellow5: true,
+  containsCochinealOrCarmine: true,
+  sulfitesPpm: 22,
+  wineAppellation: '',
+  wineAppellationType: undefined,
+  wineAppellationPercentage: undefined,
+  wineVarietals: [],
+  wineVintage: '',
+  wineVintagePercentage: undefined,
+  productionFacts: 'Approved specialty-wine formula uses carmine and the stated natural cherry flavor composition.',
+}
+
+const UNDER_SEVEN_WINE_APPLICATION: ApplicationData = {
+  ...DOMESTIC_WINE_APPLICATION,
+  brandName: 'LIGHTHOUSE CIDER',
+  classType: 'APPLE WINE',
+  alcoholContent: '6.5% Alc. by Vol.',
+  netContents: '355 mL',
+  containerVolumeMl: 355,
+  applicantName: 'LIGHTHOUSE CIDER HOUSE',
+  applicantAddress: 'PORTLAND, MAINE',
+  permitName: 'LIGHTHOUSE CIDER HOUSE',
+  permitAddress: 'PORTLAND, MAINE',
+  sulfitesPpm: 0,
+  wineAppellation: undefined,
+  wineAppellationType: undefined,
+  wineAppellationPercentage: undefined,
+  wineVarietals: undefined,
+  wineVintage: undefined,
+  wineVintagePercentage: undefined,
+  productionFacts: 'Domestic still apple wine bottled at the qualified wine premises.',
+}
+
 export const SAMPLE_LABELS: SampleLabel[] = [
   {
     id: 'valid',
@@ -333,6 +468,72 @@ export const SAMPLE_LABELS: SampleLabel[] = [
     name: 'Intrastate exemption and bottle evidence',
     description: 'A domestic exemption label with its State limitation and a complete distinctive-bottle packet.',
     application: EXEMPTION_DISTINCTIVE_APPLICATION,
+  },
+  {
+    id: 'wine-domestic-complete',
+    name: 'Domestic wine — varietal and vintage',
+    description: 'A clear Napa Valley Cabernet with supported varietal, vintage, appellation, and sulfite statements.',
+    application: DOMESTIC_WINE_APPLICATION,
+  },
+  {
+    id: 'wine-varietal-support-conflict',
+    name: 'Wine varietal support conflict',
+    description: 'The label says Cabernet Sauvignon while production records support only 60 percent of that variety.',
+    application: WINE_VARIETAL_CONFLICT_APPLICATION,
+  },
+  {
+    id: 'wine-estate-complete',
+    name: 'Estate-bottled wine — complete',
+    description: 'A Sonoma Valley Chardonnay with complete estate-origin and continuous-production support.',
+    application: ESTATE_WINE_APPLICATION,
+  },
+  {
+    id: 'wine-imported-complete',
+    name: 'Imported wine — complete',
+    description: 'A French wine with matching importer, origin, Bordeaux appellation, and vintage evidence.',
+    application: IMPORTED_WINE_APPLICATION,
+  },
+  {
+    id: 'wine-imported-origin-conflict',
+    name: 'Imported wine origin conflict',
+    description: 'The application says France while the readable artwork says Product of Italy.',
+    application: IMPORTED_WINE_APPLICATION,
+  },
+  {
+    id: 'wine-formula-complete',
+    name: 'Formula wine disclosures — complete',
+    description: 'A specialty apple wine with formula composition, Yellow No. 5, sulfites, and carmine declarations.',
+    application: FORMULA_WINE_APPLICATION,
+  },
+  {
+    id: 'wine-formula-missing',
+    name: 'Formula wine disclosures — missing',
+    description: 'The same formula packet with required composition and additive statements missing from the artwork.',
+    application: FORMULA_WINE_APPLICATION,
+  },
+  {
+    id: 'wine-formula-conflict',
+    name: 'Formula wine composition conflict',
+    description: 'The formula requires natural cherry flavor while the readable composition says artificial cherry flavor.',
+    application: FORMULA_WINE_APPLICATION,
+  },
+  {
+    id: 'wine-under-seven-complete',
+    name: 'Wine below 7% — TTB checks complete',
+    description: 'Domestic cider routed outside Part 4 while retaining applicable TTB Parts 16 and 24 checks.',
+    application: UNDER_SEVEN_WINE_APPLICATION,
+  },
+  {
+    id: 'wine-under-seven-missing',
+    name: 'Wine below 7% — missing Part 24 information',
+    description: 'A below-7% domestic wine missing its kind-of-wine and premises statements.',
+    application: UNDER_SEVEN_WINE_APPLICATION,
+  },
+  {
+    id: 'wine-glare-photo',
+    name: 'Wine with glare and low contrast',
+    description: 'The supported domestic varietal wine photographed with glare across conditional evidence.',
+    application: DOMESTIC_WINE_APPLICATION,
   },
 ]
 
@@ -516,11 +717,79 @@ function additionalConditionalLabel(variant: SampleVariant) {
   </svg>`
 }
 
+function wineLabel(variant: SampleVariant) {
+  const estate = variant === 'wine-estate-complete'
+  const imported = variant === 'wine-imported-complete' || variant === 'wine-imported-origin-conflict'
+  const formula = variant === 'wine-formula-complete' || variant === 'wine-formula-missing' || variant === 'wine-formula-conflict'
+  const underSeven = variant === 'wine-under-seven-complete' || variant === 'wine-under-seven-missing'
+  const missing = variant === 'wine-formula-missing' || variant === 'wine-under-seven-missing'
+  const brand = estate ? 'STONE ARBOR' : imported ? 'MONTCLAIRE' : formula ? 'ORCHARD BLOOM' : underSeven ? 'LIGHTHOUSE CIDER' : 'RIDGE & RIVER'
+  const classType = estate ? 'CHARDONNAY' : imported ? 'RED WINE' : formula ? 'WINE SPECIALTY' : underSeven ? 'APPLE WINE' : 'CABERNET SAUVIGNON'
+  const appellation = estate ? 'SONOMA VALLEY' : imported ? 'BORDEAUX' : 'NAPA VALLEY'
+  const alcohol = estate ? '12.8% Alc. by Vol.' : imported ? '13% Alc. by Vol.' : formula ? '11% Alc. by Vol.' : underSeven ? '6.5% Alc. by Vol.' : '13.5% Alc. by Vol.'
+  const volume = underSeven ? '355 mL' : '750 mL'
+  const responsibility = estate
+    ? 'BOTTLED BY STONE ARBOR ESTATE, SONOMA, CALIFORNIA'
+    : imported
+      ? 'IMPORTED BY ATLANTIC CELLARS IMPORTS, NEWARK, NEW JERSEY'
+      : formula
+        ? 'BOTTLED BY ORCHARD BLOOM WINERY, ITHACA, NEW YORK'
+        : underSeven
+          ? 'BOTTLED BY LIGHTHOUSE CIDER HOUSE, PORTLAND, MAINE'
+          : 'BOTTLED BY RIDGE & RIVER WINERY, ST. HELENA, CALIFORNIA'
+  const origin = variant === 'wine-imported-origin-conflict' ? 'PRODUCT OF ITALY' : 'PRODUCT OF FRANCE'
+  const composition = variant === 'wine-formula-conflict'
+    ? 'APPLE WINE WITH ARTIFICIAL CHERRY FLAVOR'
+    : 'APPLE WINE WITH NATURAL CHERRY FLAVOR'
+  const conditional = formula && !missing
+    ? [
+        composition,
+        'CONTAINS FD&C YELLOW NO. 5',
+        'CONTAINS SULFITES · CONTAINS CARMINE',
+      ]
+    : []
+  const wineDetails = estate
+    ? ['ESTATE BOTTLED', appellation, classType, 'CONTAINS SULFITES']
+    : imported
+      ? ['2022', appellation, classType, origin, 'CONTAINS SULFITES']
+      : formula
+        ? [classType, ...conditional]
+        : underSeven
+          ? missing ? [] : [classType]
+          : ['2023', appellation, classType, 'CONTAINS SULFITES']
+  const palette = estate
+    ? ['#173a2e', '#e8dfc4', '#8e7243']
+    : imported
+      ? ['#401821', '#f3e7d9', '#b78b58']
+      : formula
+        ? ['#682744', '#f6ddbd', '#da9147']
+        : underSeven
+          ? ['#164e5b', '#e4eee8', '#d4aa4d']
+          : ['#243c5a', '#f1e6ce', '#9b743d']
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="1900" viewBox="0 0 1500 1900">
+    <rect width="1500" height="1900" fill="${palette[1]}"/>
+    <rect x="38" y="38" width="1424" height="1824" rx="34" fill="none" stroke="${palette[0]}" stroke-width="9"/>
+    <path d="M0 0 H1500 V390 Q1120 300 750 410 Q370 520 0 390Z" fill="${palette[0]}"/>
+    <circle cx="750" cy="235" r="102" fill="none" stroke="${palette[2]}" stroke-width="8"/>
+    <path d="M705 250 Q750 125 795 250 Q750 215 705 250" fill="${palette[2]}"/>
+    <text x="750" y="540" text-anchor="middle" font-family="Arial, sans-serif" font-size="94" font-weight="700" letter-spacing="3" fill="${palette[0]}">${escapeXml(brand)}</text>
+    <path d="M215 600 H1285" stroke="${palette[2]}" stroke-width="4"/>
+    ${wineDetails.map((line, index) => `<text x="750" y="${700 + index * 72}" text-anchor="middle" font-family="Arial, sans-serif" font-size="${index === 0 ? 43 : 36}" font-weight="${index < 3 ? 700 : 400}" fill="${palette[0]}">${escapeXml(line)}</text>`).join('')}
+    <text x="110" y="1100" font-family="Arial, sans-serif" font-size="38" font-weight="700">${alcohol}</text>
+    <text x="1390" y="1100" text-anchor="end" font-family="Arial, sans-serif" font-size="38" font-weight="700">${volume}</text>
+    <rect x="75" y="1180" width="1350" height="350" rx="12" fill="#fffdf8" stroke="${palette[0]}" stroke-width="3"/>
+    ${warningMarkup(variant, { x: 95, y: 1265, size: 27, lineHeight: 50 })}
+    ${missing && underSeven ? '' : `<text x="750" y="1650" text-anchor="middle" font-family="Arial, sans-serif" font-size="27">${escapeXml(responsibility)}</text>`}
+    <text x="750" y="1740" text-anchor="middle" font-family="Georgia, serif" font-size="30" fill="${palette[0]}">GROWN WITH CARE · REVIEWED WITH EVIDENCE</text>
+  </svg>`
+}
+
 function sampleSvg(variant: SampleVariant) {
   if (variant === 'angled-photo') return emberLabel()
   if (variant === 'glare-photo') return harborLabel()
   if (variant === 'dark-label') return orchardLabel()
   if (['production-disclosures', 'significant-solids', 'exemption-distinctive'].includes(variant)) return additionalConditionalLabel(variant)
+  if (variant.startsWith('wine-')) return wineLabel(variant)
   if (['imported-clear', 'imported-origin-mismatch', 'imported-age-understatement', 'imported-age-overstatement', 'conditional-disclosures', 'conditional-missing', 'formula-composition-conflict', 'blur-photo', 'partial-obstruction', 'missing-context', 'routing-override'].includes(variant)) return expandedRuleLabel(variant)
   return classicLabel(variant)
 }
@@ -569,7 +838,7 @@ export async function createSampleFile(variant: SampleVariant) {
     if (variant === 'blur-photo') context.filter = 'blur(2.4px) contrast(0.88)'
     context.drawImage(image, 0, 0)
     context.filter = 'none'
-    if (variant === 'glare-photo') {
+    if (variant === 'glare-photo' || variant === 'wine-glare-photo') {
       const glare = context.createLinearGradient(250, 0, 950, 1300)
       glare.addColorStop(0, 'rgba(255,255,255,0)')
       glare.addColorStop(0.42, 'rgba(255,255,255,0.08)')

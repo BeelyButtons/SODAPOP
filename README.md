@@ -1,6 +1,6 @@
 # SODAPOP
 
-SODAPOP — System for Optical Detection, Analysis & Packaging-Oversight Processing — is an AI-assisted proof of concept for reviewing distilled-spirits label artwork against selected TTB COLA application values and federal warning requirements.
+SODAPOP — System for Optical Detection, Analysis & Packaging-Oversight Processing — is an AI-assisted proof of concept for reviewing beverage-alcohol label artwork against selected TTB COLA application values and federal warning requirements.
 
 > **Prototype boundary:** SODAPOP is decision support, not an autonomous approval system. It surfaces evidence, discrepancies, and uncertainty, then requires a qualified staff member to make and submit the final Pass or Fail decision.
 
@@ -23,12 +23,14 @@ SODAPOP — System for Optical Detection, Analysis & Packaging-Oversight Process
 - Angled-label deskewing and orientation-aware highlights: working
 - Conditional glare and alternate-orientation OCR retries: working
 - URL-aware SPA views for the queue, individual cases, new-label intake, and results: working
-- Automated verification: 127 routing, rule-coverage, interface, OCR, decision-workflow, and regression tests passing, plus GitHub Pages production-build and lint checks
+- Automated verification: 160 routing, rule-coverage, interface, OCR, decision-workflow, and regression tests passing, plus GitHub Pages production-build and lint checks
 - Post-rule-expansion routing foundation: working, with seven TTB review/routing rule sets, tri-state applicability, automatic selection, transparent selection reasons, and reviewer overrides
 - Cached-evidence rule-set reanalysis: working without a second OCR pass; alternative rule sets are ranked only when the reviewer opens the rule control
 - Centered rule-set window: working with a pinned close control, outside-click and Escape dismissal, applicable-first rule details, collapsed non-applicable rules, focus restoration, and a compact alternative selector
 - Expanded distilled-spirits review: working for domestic/imported base requirements and conditional formula, exemption, bottle, composition, age, production, color, sulfite, and aspartame branches
 - Distilled-spirits regression queue: 23 cases spanning clear matches, explicit conflicts, missing context, incorrect routing, formula disclosures, permitted age understatement, prohibited age overstatement, glare, blur, low contrast, perspective, rotation, and partial obstruction
+- Expanded wine review: working for domestic and imported wines at 7% alcohol or more, plus the TTB domestic-wine labeling and health-warning branch below 7%
+- Wine regression queue: 11 cases spanning supported and conflicting appellation/varietal evidence, estate bottling, imported origin, formula disclosures, below-7% complete and incomplete labels, and glare
 - Batch review: planned after the single-label workflow is validated
 - Live URL: [https://beelybuttons.github.io/SODAPOP/](https://beelybuttons.github.io/SODAPOP/)
 
@@ -57,12 +59,14 @@ SODAPOP — System for Optical Detection, Analysis & Packaging-Oversight Process
 21. Selects a TTB rule set from the COLA application context: beverage type, domestic/imported source, and wine alcohol content.
 22. Shows the applied rule set and its selection reasons in the sticky review bar; the centered rule window prioritizes applicable and missing-context rules while keeping non-applicable rules available behind an intentional disclosure.
 23. Lets staff inspect a full rule reference in a separate browser tab, override a mistaken selection, and rerun deterministic analysis from cached OCR and image evidence.
-24. Produces a staff Pass/Fail card for every applicable distilled-spirits rule instead of limiting review to the original six comparisons.
+24. Produces a staff Pass/Fail card for every applicable implemented beverage rule instead of limiting review to the original six comparisons.
 25. Recommends Pass or Mismatch when application/supporting information and readable artwork evidence support that result; it uses Human review only when context or visible evidence is genuinely unresolved.
 26. Explains why selected distilled-spirits rules apply, exposes the specific application/supporting fact behind a conclusion, and identifies what the label actually showed instead of referring vaguely to a “review packet.”
 27. Highlights brand, class/type, and alcohol content together for same-field-of-vision review, names the exact unresolved field, and recognizes and highlights supported age statements in years, months, or days.
 28. Applies the TTB age distinction that a label may understate documented age but may not overstate it, rejects maximum-age wording, and prevents an understatement from conflicting with the domestic straight-whisky standard of identity.
 29. Exercises every distilled-spirits conditional rule through `applies`, `does not apply`, and `missing context` tests, so missing application facts cannot silently route a conditional check away.
+30. Applies domestic and imported wine rules for alcohol statements, responsible-party information, brand-label placement, country of origin, appellation, varietal, vintage, estate bottling, foreign-wine percentage, formula composition, sulfites, Yellow No. 5, and cochineal/carmine disclosures.
+31. Routes domestic wine below 7% alcohol out of Part 4 while still checking the Part 24 premises name/address, brand when different, alcohol content, net contents, kind of wine, and the Part 16 health warning when applicable; FDA rules remain outside this TTB prototype.
 
 The application uses meaningful browser routes even though it remains a client-side SPA:
 
@@ -96,6 +100,8 @@ The project owner's reviewer safeguard is now implemented: the selected rule set
 The project owner next required actual domestic and imported distilled-spirits cards and a regression queue that resembles real review conditions instead of repeating clean, nearly identical artwork. Combining regulatory branches with image defects exposed an unnecessary retry loop: an obstructed label had already yielded four of five core evidence groups, but OCR kept rescanning for the covered field and took 12.9 seconds. The quality gate now stops that high-confidence partial pass, surfaces the covered field for staff review, and completed the same case in 3.8 seconds during local validation.
 
 The first distilled-spirits hardening pass then tested every conditional branch in all three applicability states and added reviewer-visible edge cases for age and formula conflicts. This work corrected an over-strict age comparison: under [27 CFR 5.74](https://www.ecfr.gov/current/title-27/chapter-I/subchapter-A/part-5/subpart-E/section-5.74), age may be understated but not overstated, and maximum-age forms are not acceptable. SODAPOP now distinguishes those outcomes, supports years, months, and days, preserves the standard-of-identity safeguard for domestic straight whisky, and declines to guess whether a packet means cochineal extract or carmine when the specific additive is missing. Live local OCR validation returned the new age-understatement, age-overstatement, and formula-conflict cases in 1.7–1.8 seconds with the intended Pass/Mismatch recommendations.
+
+The project owner then directed the wine expansion to remain firmly within TTB's review role: domestic and imported branches, explicit jurisdiction routing below 7% alcohol, strong automated recommendations wherever the evidence supports them, and staff Pass/Fail on every applicable card. That direction corrected an important early simplification. Domestic wine below 7% is not merely a warning-routing case; TTB's Part 24 guidance also requires premises name/address, brand when different, alcohol content, net contents, and kind-of-wine evidence. The implemented wine engine now covers those requirements plus the Part 4 alcohol, responsibility, origin, appellation, varietal, vintage, estate, formula, sulfite, and color-additive branches. Eleven visibly varied wine cases bring the demonstration queue to 34 labels. Live browser OCR checks completed clear, imported, formula, below-7%, and glare cases in 1.8–2.3 seconds on the development machine.
 
 ### Review queue and accessibility improvements
 
@@ -154,7 +160,7 @@ Application values → validation → deterministic comparison rules → review 
 - **Tesseract.js:** zero-cost local OCR with no external ML endpoint at review time.
 - **Deterministic verification:** exact and numeric regulatory checks do not depend on generative-model judgment.
 - **Quality-gated retries:** extra OCR work is performed only when expected label evidence remains incomplete.
-- **Rule-driven distilled-spirits evaluation:** applicable formal rules become evidence cards using COLA, formula, permit, production, and OCR facts.
+- **Rule-driven beverage evaluation:** applicable distilled-spirits and wine rules become evidence cards using COLA, formula, permit, production, and OCR facts.
 - **No database or accounts:** only demonstration-queue decisions are persisted in browser storage; images and extracted label content remain in memory.
 - **Static deployment:** the current slice can run on GitHub Pages without a paid backend.
 
@@ -178,6 +184,7 @@ The real process uses COLAs Online or [TTB Form 5100.31](https://www.ttb.gov/med
 - Complete-label, container-marking, label-dimension, and distinctive-bottle evidence
 - Imported country-of-origin and bottling-disposition facts
 - Conditional composition and production facts for solids, neutral spirits, age, wood treatment, State of distillation, color additives, sulfites, and aspartame
+- Wine origin, appellation type and percentage, varietal composition, vintage support, estate-production continuity, foreign-law support, and foreign-wine blend percentage
 
 Class/type is included because it is part of the exercise’s expected review, even though it is not necessarily entered as an independent field on every current COLA application. A future integration should map from the authoritative COLAs Online data contract rather than this prototype form.
 
@@ -254,7 +261,7 @@ public/ocr/          Same-origin OCR worker, runtime, and language assets
 
 ## Assumptions and limitations
 
-- Automatic rule-set routing covers distilled spirits, wine, and malt beverages. Distilled-spirits cards are expanded for domestic/imported base and conditional rules. Wine and malt-beverage cards remain future increments except for the explicit under-7%-wine TTB warning/routing branch.
+- Automatic rule-set routing covers distilled spirits, wine, and malt beverages. Distilled-spirits and wine cards are expanded for their implemented domestic/imported base and conditional rules. Malt-beverage cards remain the next rule-engine increment.
 - This prototype uses manual application entry. Batch CSV input comes next.
 - OCR accuracy still depends on image quality. Included glare, perspective, upside-down, varied-layout, and reverse-type fixtures expose these limitations for staff evaluation and regression testing.
 - The five-second result is a development-machine measurement on synthetic fixtures, not a service-level guarantee.
@@ -268,8 +275,8 @@ The current implementation has no application runtime fee: all processing is loc
 
 ## Next increment
 
-1. Project-owner review of the expanded domestic/imported distilled-spirits cards and 23-case regression queue, including the new age-understatement, age-overstatement, and formula-composition-conflict cases.
+1. Project-owner review of the expanded wine cards and 11-case wine regression set.
 2. Refine any recommendation or sample that hands-on review exposes as misleading, overly confident, or unnecessarily manual.
-3. Expand wine cards in reviewed increments, including the 7-percent TTB jurisdiction boundary and imported/domestic branches.
-4. Expand malt-beverage cards while preserving automatic routing, tri-state applicability, cached evidence, and staff Pass/Fail for every applicable item.
+3. Expand malt-beverage cards while preserving automatic routing, tri-state applicability, cached evidence, and staff Pass/Fail for every applicable item.
+4. Test difficult and incomplete application packets and label photos across all implemented beverage categories.
 5. Return to batch intake and export only after the single-label rule-expanded workflow is accepted.

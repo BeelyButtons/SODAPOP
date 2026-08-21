@@ -19,7 +19,7 @@ export function RuleSetReference({ ruleSetId }: { ruleSetId: string }) {
         <h1 id="rule-reference-title">{ruleSet.label}</h1>
         <p>{ruleSet.description}</p>
         <dl>
-          <div><dt>Review path</dt><dd>{ruleSet.jurisdiction === 'full_cola_review' ? 'Full TTB COLA review' : 'TTB jurisdiction routing only'}</dd></div>
+          <div><dt>Review path</dt><dd>{ruleSet.jurisdiction === 'full_cola_review' ? 'Full TTB COLA review' : 'TTB non-COLA routing and label checks'}</dd></div>
           <div><dt>Selection facts</dt><dd>{ruleSet.selectionFacts.join(', ')}</dd></div>
           <div><dt>Total rules</dt><dd>{baseRules.length + conditionalRules.length}</dd></div>
         </dl>
@@ -64,4 +64,3 @@ function RuleReferenceGroup({
     </section>
   )
 }
-
