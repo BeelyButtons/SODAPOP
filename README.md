@@ -22,7 +22,8 @@ SODAPOP — System for Optical Detection, Analysis & Packaging-Oversight Process
 - Angled-label deskewing and orientation-aware highlights: working
 - Conditional glare and alternate-orientation OCR retries: working
 - URL-aware SPA views for the queue, individual cases, new-label intake, and results: working
-- Automated verification: 46 tests, GitHub Pages production build, and lint checks passing
+- Automated verification: 59 tests, GitHub Pages production build, and lint checks passing
+- Post-rule-expansion specification: seven TTB review/routing rule sets, granular rule records, and an application-data source map are ready for project-owner review; routing and UI behavior are not yet implemented
 - Batch review: planned after the single-label workflow is validated
 - Live URL: [https://beelybuttons.github.io/SODAPOP/](https://beelybuttons.github.io/SODAPOP/)
 
@@ -68,6 +69,14 @@ The included synthetic cases demonstrate a matching label, incorrect ABV, incorr
 The workflow is being improved through repeated hands-on review by the project owner in collaboration with Codex. The project owner has driven the practical improvements: simplifying the opening experience, moving privacy information out of the way, making the label easier to inspect, identifying misleading sample-label behavior, requesting status-aware highlights, broadening the test-label designs, requiring an explicit staff decision instead of treating automation as approval, and replacing destructive re-review with a reviewer-friendly correction and audit-history workflow.
 
 That iterative review materially changed the product from a basic OCR comparison demo into a staff-centered decision-support workflow. The project owner's latest review introduced the portal, persistent queue, sequential review experience, accessible evidence hierarchy, and quick-fail path. Each improvement is evaluated against a simple principle: automation should help staff locate and understand evidence, while staff retain responsibility for the regulatory determination.
+
+### Post-rule expansion
+
+The project owner defined all work through the current distilled-spirits experience as the **pre-rule-expansion** phase. The next phase expands SODAPOP into TTB rule selection and review support for domestic and imported distilled spirits, wine, and malt beverages while preserving the established staff Pass/Fail workflow.
+
+Before changing the interface or verification behavior, the approved research catalog was converted into a formal specification in [`docs/post-rule-expansion-specification.md`](docs/post-rule-expansion-specification.md) and `src/domain/ruleSpecification.ts`. It defines one record per reviewer-facing rule, the application/formula/supporting facts needed to decide applicability, seven initial regulatory rule sets, explicit missing-context behavior, and integrity tests. Wine below 7 percent alcohol by volume is represented as a TTB jurisdiction-routing branch without implementing FDA rules.
+
+The project owner's proposed reviewer safeguard is also part of the specification: the selected rule set will be visible in the sticky decision bar, explain why it was selected, provide a separate full-reference view, and permit a deliberate reviewer override followed by reanalysis. Alternative ranking and detailed rule views will be loaded only when requested, while an override will reuse cached OCR and image evidence. This keeps rule transparency and correction available without burdening the initial five-second analysis target.
 
 ### Review queue and accessibility improvements
 
@@ -227,9 +236,9 @@ The current implementation has no application runtime fee: all processing is loc
 
 ## Next increment
 
-1. Validate the renumbered queue, completed-history controls, per-card correction workflow, readability, and quick-fail experience with staff reviewers.
-2. Continue the single-label rule sequence with deeper brand name, alcohol content, net contents, and additional checks.
-3. Expand browser-level OCR regression benchmarks for angled, glare, dark, and upside-down fixtures.
-4. Add CSV plus multiple-image batch intake with deterministic image-to-row matching.
-5. Process a limited number of labels concurrently and preserve per-item failures and staff decisions.
-6. Export a review summary and add wine and malt-beverage rule modules if appropriate.
+1. Review and approve the post-rule-expansion rule and application-data specification.
+2. Implement tri-state applicability and automatic rule-set routing without changing the current staff decision rule.
+3. Expand the distilled-spirits review cards and regression tests from the approved specification.
+4. Add the visible rule-set explanation, full-reference route, manual override, and cached-evidence reanalysis.
+5. Validate the five-second target on clean and difficult images before adding wine and malt-beverage engines.
+6. Add wine and malt-beverage rules in reviewed increments, then return to batch intake and export work.
