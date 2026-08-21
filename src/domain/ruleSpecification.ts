@@ -413,7 +413,7 @@ export const RULE_SPECIFICATIONS = [
     appliesWhen: { description: 'An age statement is required or the artwork makes an age or maturity claim.', any: [{ fact: 'requiresAgeStatement', operator: 'equals', value: true }, { fact: 'spiritsAgeOrMaturityClaim', operator: 'equals', value: true }] },
     requiredFacts: ['requiresAgeStatement', 'spiritsAgeOrMaturityClaim', 'productionFacts', 'labelSet'],
     evidenceSources: ['formula', 'supporting_document', 'label_artwork'],
-    evaluation: ['Compare stated age with the youngest applicable spirits and required wording.', 'Evaluate nearby maturity representations.'],
+    evaluation: ['Compare stated age with the youngest applicable spirits, allowing supported understatement but prohibiting overstatement and maximum-age wording.', 'Reject an understatement that conflicts with the applicable standard of identity.', 'Evaluate nearby maturity representations.'],
     missingContext: 'Identify missing aging facts and do not validate an unsupported age claim.',
     reviewerCard: true,
   },

@@ -12,8 +12,11 @@ type SampleVariant =
   | 'upside-down'
   | 'imported-clear'
   | 'imported-origin-mismatch'
+  | 'imported-age-understatement'
+  | 'imported-age-overstatement'
   | 'conditional-disclosures'
   | 'conditional-missing'
+  | 'formula-composition-conflict'
   | 'blur-photo'
   | 'partial-obstruction'
   | 'missing-context'
@@ -260,6 +263,18 @@ export const SAMPLE_LABELS: SampleLabel[] = [
     application: IMPORTED_APPLICATION,
   },
   {
+    id: 'imported-age-understatement',
+    name: 'Imported age — allowed understatement',
+    description: 'The youngest whisky is documented at eight years and the label permissibly states seven years.',
+    application: IMPORTED_APPLICATION,
+  },
+  {
+    id: 'imported-age-overstatement',
+    name: 'Imported age — prohibited overstatement',
+    description: 'The youngest whisky is documented at eight years while the readable label improperly states nine years.',
+    application: IMPORTED_APPLICATION,
+  },
+  {
     id: 'conditional-disclosures',
     name: 'Formula disclosures — complete',
     description: 'A specialty liqueur with formula wording, Yellow No. 5, sulfites, and aspartame declarations.',
@@ -269,6 +284,12 @@ export const SAMPLE_LABELS: SampleLabel[] = [
     id: 'conditional-missing',
     name: 'Formula disclosures — missing',
     description: 'The same formula packet with required conditional declarations omitted from the artwork.',
+    application: CONDITIONAL_APPLICATION,
+  },
+  {
+    id: 'formula-composition-conflict',
+    name: 'Formula composition conflict',
+    description: 'The formula requires natural flavors while the readable statement of composition says artificial flavors.',
     application: CONDITIONAL_APPLICATION,
   },
   {
@@ -413,14 +434,19 @@ function orchardLabel() {
 }
 
 function expandedRuleLabel(variant: SampleVariant) {
-  const imported = variant === 'imported-clear' || variant === 'imported-origin-mismatch' || variant === 'partial-obstruction' || variant === 'routing-override'
-  const conditional = variant === 'conditional-disclosures' || variant === 'conditional-missing'
+  const imported = ['imported-clear', 'imported-origin-mismatch', 'imported-age-understatement', 'imported-age-overstatement', 'partial-obstruction', 'routing-override'].includes(variant)
+  const conditional = ['conditional-disclosures', 'conditional-missing', 'formula-composition-conflict'].includes(variant)
   const missingContext = variant === 'missing-context'
   const brand = conditional ? 'CITRUS FORGE' : missingContext ? 'PACKET GAP' : imported ? (variant === 'routing-override' ? 'ROUTING CHECK' : 'NORTH SEA RESERVE') : 'EMBER & ASH'
   const classType = conditional ? 'DISTILLED SPIRITS SPECIALTY' : missingContext ? 'VODKA' : imported ? 'SINGLE MALT SCOTCH WHISKY' : 'STRAIGHT RYE WHISKEY'
   const alcohol = conditional ? '30% Alc./Vol. (60 Proof)' : missingContext ? '40% Alc./Vol. (80 Proof)' : imported ? '46% Alc./Vol. (92 Proof)' : '50% Alc./Vol. (100 Proof)'
   const volume = imported ? '700 mL' : '750 mL'
   const origin = variant === 'imported-origin-mismatch' ? 'PRODUCT OF IRELAND' : 'PRODUCT OF SCOTLAND'
+  const age = variant === 'imported-age-understatement'
+    ? 'AGED 7 YEARS'
+    : variant === 'imported-age-overstatement'
+      ? 'AGED 9 YEARS'
+      : 'AGED 8 YEARS'
   const responsibility = imported
     ? 'IMPORTED BY ATLANTIC IMPORTS LLC, BALTIMORE, MARYLAND'
     : conditional
@@ -428,9 +454,12 @@ function expandedRuleLabel(variant: SampleVariant) {
       : missingContext
         ? 'BOTTLED BY PACKET GAP SPIRITS, DENVER, COLORADO'
         : 'DISTILLED AND BOTTLED BY EMBER & ASH DISTILLING, LOUISVILLE, KENTUCKY'
+  const composition = variant === 'formula-composition-conflict'
+    ? 'ORANGE LIQUEUR WITH ARTIFICIAL FLAVORS'
+    : 'ORANGE LIQUEUR WITH NATURAL FLAVORS'
   const conditionalStatements = conditional && variant !== 'conditional-missing'
     ? `<text x="90" y="880" font-family="Arial, sans-serif" font-size="27" font-weight="700">GOLDEN CITRUS</text>
-       <text x="90" y="925" font-family="Arial, sans-serif" font-size="25">ORANGE LIQUEUR WITH NATURAL FLAVORS</text>
+       <text x="90" y="925" font-family="Arial, sans-serif" font-size="25">${composition}</text>
        <text x="90" y="970" font-family="Arial, sans-serif" font-size="23">CONTAINS FD&amp;C YELLOW NO. 5 · CONTAINS SULFITES</text>
        <text x="90" y="1015" font-family="Arial, sans-serif" font-size="22" font-weight="700">PHENYLKETONURICS: CONTAINS PHENYLALANINE</text>`
     : ''
@@ -443,7 +472,7 @@ function expandedRuleLabel(variant: SampleVariant) {
     <path d="M100 355 H1400" stroke="#8b642b" stroke-width="4"/>
     <text x="105" y="455" font-family="Arial, sans-serif" font-size="39" font-weight="700">${alcohol}</text>
     <text x="1395" y="455" text-anchor="end" font-family="Arial, sans-serif" font-size="39" font-weight="700">${volume}</text>
-    ${imported ? `<text x="105" y="545" font-family="Arial, sans-serif" font-size="34" font-weight="700">AGED 8 YEARS</text><text x="1395" y="545" text-anchor="end" font-family="Arial, sans-serif" font-size="34" font-weight="700">${origin}</text>` : ''}
+    ${imported ? `<text x="105" y="545" font-family="Arial, sans-serif" font-size="34" font-weight="700">${age}</text><text x="1395" y="545" text-anchor="end" font-family="Arial, sans-serif" font-size="34" font-weight="700">${origin}</text>` : ''}
     ${conditionalStatements}
     <rect x="75" y="1115" width="1350" height="350" rx="10" fill="#fffdf8" stroke="#173d31" stroke-width="3"/>
     ${warningMarkup(variant, { x: 95, y: 1200, size: 27, lineHeight: 50 })}
@@ -492,7 +521,7 @@ function sampleSvg(variant: SampleVariant) {
   if (variant === 'glare-photo') return harborLabel()
   if (variant === 'dark-label') return orchardLabel()
   if (['production-disclosures', 'significant-solids', 'exemption-distinctive'].includes(variant)) return additionalConditionalLabel(variant)
-  if (['imported-clear', 'imported-origin-mismatch', 'conditional-disclosures', 'conditional-missing', 'blur-photo', 'partial-obstruction', 'missing-context', 'routing-override'].includes(variant)) return expandedRuleLabel(variant)
+  if (['imported-clear', 'imported-origin-mismatch', 'imported-age-understatement', 'imported-age-overstatement', 'conditional-disclosures', 'conditional-missing', 'formula-composition-conflict', 'blur-photo', 'partial-obstruction', 'missing-context', 'routing-override'].includes(variant)) return expandedRuleLabel(variant)
   return classicLabel(variant)
 }
 

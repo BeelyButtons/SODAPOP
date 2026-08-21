@@ -23,12 +23,12 @@ SODAPOP — System for Optical Detection, Analysis & Packaging-Oversight Process
 - Angled-label deskewing and orientation-aware highlights: working
 - Conditional glare and alternate-orientation OCR retries: working
 - URL-aware SPA views for the queue, individual cases, new-label intake, and results: working
-- Automated verification: routing, interface, OCR, decision-workflow, GitHub Pages production-build, and lint checks passing
+- Automated verification: 127 routing, rule-coverage, interface, OCR, decision-workflow, and regression tests passing, plus GitHub Pages production-build and lint checks
 - Post-rule-expansion routing foundation: working, with seven TTB review/routing rule sets, tri-state applicability, automatic selection, transparent selection reasons, and reviewer overrides
 - Cached-evidence rule-set reanalysis: working without a second OCR pass; alternative rule sets are ranked only when the reviewer opens the rule control
 - Centered rule-set window: working with a pinned close control, outside-click and Escape dismissal, applicable-first rule details, collapsed non-applicable rules, focus restoration, and a compact alternative selector
 - Expanded distilled-spirits review: working for domestic/imported base requirements and conditional formula, exemption, bottle, composition, age, production, color, sulfite, and aspartame branches
-- Distilled-spirits regression queue: 20 cases spanning clear matches, explicit conflicts, missing context, incorrect routing, formula disclosures, glare, blur, low contrast, perspective, rotation, and partial obstruction
+- Distilled-spirits regression queue: 23 cases spanning clear matches, explicit conflicts, missing context, incorrect routing, formula disclosures, permitted age understatement, prohibited age overstatement, glare, blur, low contrast, perspective, rotation, and partial obstruction
 - Batch review: planned after the single-label workflow is validated
 - Live URL: [https://beelybuttons.github.io/SODAPOP/](https://beelybuttons.github.io/SODAPOP/)
 
@@ -60,7 +60,9 @@ SODAPOP — System for Optical Detection, Analysis & Packaging-Oversight Process
 24. Produces a staff Pass/Fail card for every applicable distilled-spirits rule instead of limiting review to the original six comparisons.
 25. Recommends Pass or Mismatch when application/supporting information and readable artwork evidence support that result; it uses Human review only when context or visible evidence is genuinely unresolved.
 26. Explains why selected distilled-spirits rules apply, exposes the specific application/supporting fact behind a conclusion, and identifies what the label actually showed instead of referring vaguely to a “review packet.”
-27. Highlights brand, class/type, and alcohol content together for same-field-of-vision review, names the exact unresolved field, and recognizes and highlights supported age statements such as `AGED 4 YEARS`.
+27. Highlights brand, class/type, and alcohol content together for same-field-of-vision review, names the exact unresolved field, and recognizes and highlights supported age statements in years, months, or days.
+28. Applies the TTB age distinction that a label may understate documented age but may not overstate it, rejects maximum-age wording, and prevents an understatement from conflicting with the domestic straight-whisky standard of identity.
+29. Exercises every distilled-spirits conditional rule through `applies`, `does not apply`, and `missing context` tests, so missing application facts cannot silently route a conditional check away.
 
 The application uses meaningful browser routes even though it remains a client-side SPA:
 
@@ -75,7 +77,7 @@ The application uses meaningful browser routes even though it remains a client-s
 
 GitHub Pages receives a `404.html` copy of the SPA entry point so direct links and browser refreshes can return to the appropriate client-side route. Results are intentionally session-only; directly opening `/results` without an active review returns the user to `/review`.
 
-The included synthetic cases demonstrate a matching label, incorrect ABV, incorrect warning capitalization, improperly bold warning body text, a missing warning, varied layouts, reverse type, perspective, rotation, glare, blur, partial obstruction, domestic and imported routing, a country-of-origin conflict, deliberately incorrect routing, missing packet context, complete and missing formula disclosures, significant solids, neutral spirits, wood treatment, State of distillation, carmine, intrastate exemption wording, and distinctive-bottle evidence.
+The included synthetic cases demonstrate a matching label, incorrect ABV, incorrect warning capitalization, improperly bold warning body text, a missing warning, varied layouts, reverse type, perspective, rotation, glare, blur, partial obstruction, domestic and imported routing, a country-of-origin conflict, allowed age understatement, prohibited age overstatement, deliberately incorrect routing, missing packet context, complete, missing, and conflicting formula disclosures, significant solids, neutral spirits, wood treatment, State of distillation, carmine, intrastate exemption wording, and distinctive-bottle evidence.
 
 ## Product direction and iterative improvement
 
@@ -92,6 +94,8 @@ Before changing the interface or verification behavior, the approved research ca
 The project owner's reviewer safeguard is now implemented: the selected rule set is visible in the sticky decision bar, explains why it was selected, provides a separate full-reference view, and permits a deliberate reviewer override followed by reanalysis. The project owner specifically required protection against an incorrectly inferred branch without slowing routine work. SODAPOP therefore ranks alternatives only when the reviewer opens the control, clearly warns about conflicts with the application facts, clears stale card decisions when the rule set changes, and reuses cached OCR text, word coordinates, and image evidence. A later owner review exposed that the original window could be constrained by the sticky command bar and difficult to dismiss. The rule window now opens in a true page-level overlay, stays centered, pins its heading and close control while content scrolls, closes by X, Escape, or outside click, restores focus, shows applicable rules first, and keeps non-applicable rules collapsed. This preserves transparency without adding another expensive OCR pass or burdening the initial five-second analysis target.
 
 The project owner next required actual domestic and imported distilled-spirits cards and a regression queue that resembles real review conditions instead of repeating clean, nearly identical artwork. Combining regulatory branches with image defects exposed an unnecessary retry loop: an obstructed label had already yielded four of five core evidence groups, but OCR kept rescanning for the covered field and took 12.9 seconds. The quality gate now stops that high-confidence partial pass, surfaces the covered field for staff review, and completed the same case in 3.8 seconds during local validation.
+
+The first distilled-spirits hardening pass then tested every conditional branch in all three applicability states and added reviewer-visible edge cases for age and formula conflicts. This work corrected an over-strict age comparison: under [27 CFR 5.74](https://www.ecfr.gov/current/title-27/chapter-I/subchapter-A/part-5/subpart-E/section-5.74), age may be understated but not overstated, and maximum-age forms are not acceptable. SODAPOP now distinguishes those outcomes, supports years, months, and days, preserves the standard-of-identity safeguard for domestic straight whisky, and declines to guess whether a packet means cochineal extract or carmine when the specific additive is missing. Live local OCR validation returned the new age-understatement, age-overstatement, and formula-conflict cases in 1.7–1.8 seconds with the intended Pass/Mismatch recommendations.
 
 ### Review queue and accessibility improvements
 
@@ -264,7 +268,7 @@ The current implementation has no application runtime fee: all processing is loc
 
 ## Next increment
 
-1. Project-owner review of the expanded domestic/imported distilled-spirits cards and 20-case regression queue.
+1. Project-owner review of the expanded domestic/imported distilled-spirits cards and 23-case regression queue, including the new age-understatement, age-overstatement, and formula-composition-conflict cases.
 2. Refine any recommendation or sample that hands-on review exposes as misleading, overly confident, or unnecessarily manual.
 3. Expand wine cards in reviewed increments, including the 7-percent TTB jurisdiction boundary and imported/domestic branches.
 4. Expand malt-beverage cards while preserving automatic routing, tri-state applicability, cached evidence, and staff Pass/Fail for every applicable item.

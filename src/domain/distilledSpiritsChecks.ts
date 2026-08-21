@@ -288,44 +288,120 @@ function optionalInformationCard(rule: RuleApplicability, application: Applicati
   )
 }
 
+type ParsedAge = {
+  amount: number
+  unit: 'day' | 'month' | 'year'
+  text: string
+  isMaximum: boolean
+  isExclusiveMinimum: boolean
+}
+
+function singularAgeUnit(value: string): ParsedAge['unit'] {
+  if (value.toLowerCase().startsWith('year')) return 'year'
+  if (value.toLowerCase().startsWith('month')) return 'month'
+  return 'day'
+}
+
+function parseDocumentedAge(facts: string): ParsedAge | undefined {
+  const match = facts.match(
+    /(?:youngest(?: applicable)? spirit (?:is |was )?aged|youngest age:)\s*(\d+)\s*(years?|months?|days?)/i,
+  )
+  if (!match) return undefined
+  return {
+    amount: Number(match[1]),
+    unit: singularAgeUnit(match[2]),
+    text: match[0],
+    isMaximum: false,
+    isExclusiveMinimum: false,
+  }
+}
+
+function parseLabelAge(text: string): ParsedAge | undefined {
+  const maximum = text.match(
+    /\b(?:aged\s+(?:for\s+)?less\s+than\s+\d+\s+(?:years?|months?|days?)|under\s+\d+\s+(?:years?|months?|days?)\s+old|aged\s+not\s+more\s+than\s+\d+\s+(?:years?|months?|days?))\b/i,
+  )?.[0]
+  const accepted = text.match(
+    /\b(?:aged(?:\s+at\s+least|\s+a\s+minimum\s+of|\s+not\s+less\s+than)?\s+\d+\s+(?:years?|months?|days?)|over\s+\d+\s+(?:years?|months?|days?)\s+old|\d+\s+(?:years?|months?|days?)\s+old)\b/i,
+  )?.[0]
+  const detected = maximum || accepted
+  const value = detected?.match(/(\d+)\s+(years?|months?|days?)/i)
+  if (!detected || !value) return undefined
+  return {
+    amount: Number(value[1]),
+    unit: singularAgeUnit(value[2]),
+    text: detected,
+    isMaximum: Boolean(maximum),
+    isExclusiveMinimum: /^over\b/i.test(detected),
+  }
+}
+
+function comparableAgeValue(age: ParsedAge) {
+  if (age.unit === 'year') return age.amount * 12
+  if (age.unit === 'month') return age.amount
+  return undefined
+}
+
 function ageCard(rule: RuleApplicability, application: ApplicationData, text: string) {
   const facts = application.productionFacts ?? ''
-  const age = facts.match(/(?:youngest(?: applicable)? spirit (?:is |was )?aged|youngest age:)\s*(\d+)\s*(years?|months?)/i)
-  if (!age) return missingContextCard(rule)
-  const amount = age[1]
-  const unit = age[2]
+  const documented = parseDocumentedAge(facts)
+  if (!documented) return missingContextCard(rule)
   const accepted = [
-    `AGED ${amount} ${unit}`,
-    `${amount} ${unit} OLD`,
-    `AGED AT LEAST ${amount} ${unit}`,
-    `AGED A MINIMUM OF ${amount} ${unit}`,
+    '“__ years/months/days old”',
+    '“Aged __ years/months/days”',
+    '“Aged at least __” or “Aged a minimum of __”',
+    '“Over __ years old” or “Aged not less than __”',
+    'Formula-supported whisky percentage-and-age forms, when applicable',
   ]
-  const detected = text.match(/\b(?:aged(?:\s+at\s+least|\s+a\s+minimum\s+of)?\s+\d+\s+(?:years?|months?)|\d+\s+(?:years?|months?)\s+old)\b/i)?.[0]
-  const detectedAge = detected?.match(/(\d+)\s+(years?|months?)/i)
-  const ageMatches = Boolean(
-    detectedAge
-    && detectedAge[1] === amount
-    && detectedAge[2].toLowerCase().startsWith(unit.toLowerCase().startsWith('year') ? 'year' : 'month'),
+  const detected = parseLabelAge(text)
+  const documentedValue = comparableAgeValue(documented)
+  const detectedValue = detected ? comparableAgeValue(detected) : undefined
+  const comparable = documented.unit === detected?.unit || (documentedValue !== undefined && detectedValue !== undefined)
+  const overstatesAge = comparable && detectedValue !== undefined && documentedValue !== undefined
+    ? detectedValue > documentedValue || (detected?.isExclusiveMinimum === true && detectedValue === documentedValue)
+    : comparable && detected
+      ? detected.amount > documented.amount || (detected.isExclusiveMinimum && detected.amount === documented.amount)
+      : false
+  const straightWhiskyMinimumConflict = Boolean(
+    detected
+    && application.source === 'domestic'
+    && /\bstraight\b.*\bwhisk(?:y|ey)\b/i.test(application.classType)
+    && (detected.unit === 'year'
+      ? detected.amount < 2
+      : detected.unit === 'month'
+        ? detected.amount < 24
+        : detected.amount < 730),
   )
   const ageEvidence = {
     applicabilityExplanation: application.requiresAgeStatement
       ? 'The application indicates that an age statement is mandatory for this product.'
       : 'The label or application makes an age or maturity representation, so the statement must be checked.',
-    applicationEvidence: `Youngest applicable spirit: ${amount} ${unit}.`,
-    labelEvidence: detected || 'No readable age statement was detected.',
+    applicationEvidence: `Youngest applicable spirit: ${documented.amount} ${documented.unit}${documented.amount === 1 ? '' : 's'}.`,
+    labelEvidence: detected?.text || 'No readable age statement was detected.',
   }
-  if (detected && ageMatches) return {
-    ...card(rule, 'pass', detected, 'The age statement agrees with the youngest applicable spirit documented in the application or supporting information.', accepted, ageEvidence),
+  if (detected?.isMaximum) return {
+    ...card(rule, 'mismatch', detected.text, 'The label uses a maximum-age statement. TTB permits minimum ages and age understatement, but not maximum-age wording.', accepted, ageEvidence),
+    requirementsLabel: 'Allowable forms — one is required when this rule applies',
+  }
+  if (detected && straightWhiskyMinimumConflict) return {
+    ...card(rule, 'mismatch', detected.text, 'Although age may generally be understated, this statement conflicts with the minimum aging inherent in the domestic straight-whisky designation.', accepted, ageEvidence),
+    requirementsLabel: 'Allowable forms — one is required when this rule applies',
+  }
+  if (detected && comparable && !overstatesAge) return {
+    ...card(rule, 'pass', detected.text, detectedValue === documentedValue
+      ? 'The age statement agrees with the documented youngest applicable spirit.'
+      : 'The statement permissibly understates, and does not overstate, the documented age of the youngest applicable spirit.', accepted, ageEvidence),
     requirementsLabel: 'Accepted forms — one is required',
   }
   return {
     ...card(
     rule,
-    detected ? 'mismatch' : 'needs_review',
-    detected || 'Supporting age statement not matched',
-    detected
-      ? `The detected age statement does not agree with the documented youngest applicable spirit of ${amount} ${unit}.`
-      : `OCR did not reliably resolve an age statement reflecting ${amount} ${unit}. Inspect the artwork before deciding; absence from OCR alone is not a confirmed label mismatch.`,
+    detected && comparable ? 'mismatch' : 'needs_review',
+    detected?.text || 'Supporting age statement not matched',
+    detected && comparable
+      ? `The statement overstates the documented youngest applicable spirit of ${documented.amount} ${documented.unit}${documented.amount === 1 ? '' : 's'}.`
+      : detected
+        ? 'The artwork and application express age in units that cannot be compared reliably from the supplied facts. Confirm the underlying storage dates before deciding.'
+        : `OCR did not reliably resolve an age statement for the documented ${documented.amount} ${documented.unit}${documented.amount === 1 ? '' : 's'}. Inspect the artwork before deciding; absence from OCR alone is not a confirmed label mismatch.`,
     accepted,
     ageEvidence,
     ),
@@ -423,7 +499,13 @@ function evaluatedRuleCard(rule: RuleApplicability, input: Input): ReviewCheck {
     case 'spirits.yellow-5':
       return textEvidenceCard(rule, ocrText, ocrConfidence, ['CONTAINS FD&C YELLOW NO. 5'], 'The specific color-additive declaration was located.')
     case 'spirits.cochineal-carmine': {
-      const declaration = /cochineal/i.test(application.formulaLabelingInstructions ?? '') ? 'CONTAINS COCHINEAL EXTRACT' : 'CONTAINS CARMINE'
+      const colorEvidence = `${application.formulaLabelingInstructions ?? ''} ${application.productionFacts ?? ''}`
+      const declaration = /cochineal/i.test(colorEvidence)
+        ? 'CONTAINS COCHINEAL EXTRACT'
+        : /carmine/i.test(colorEvidence)
+          ? 'CONTAINS CARMINE'
+          : undefined
+      if (!declaration) return missingContextCard(rule)
       return textEvidenceCard(rule, ocrText, ocrConfidence, [declaration], 'The specific color-additive declaration was located.')
     }
     case 'spirits.sulfites':

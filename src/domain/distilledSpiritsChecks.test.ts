@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { SAMPLE_LABELS } from '../data/sampleLabels'
-import { GOVERNMENT_WARNING } from './reviewSchema'
+import { GOVERNMENT_WARNING, type ApplicationData } from './reviewSchema'
 import { overrideRuleSet, reviewContextFromApplication, selectAutomaticRuleSet } from './ruleEngine'
 import { verifyLabel } from './verifyLabel'
 
@@ -10,6 +10,10 @@ function applicationFor(id: string) {
 
 function review(id: string, text: string, ruleSetId?: string) {
   const application = applicationFor(id)
+  return reviewApplication(application, text, ruleSetId)
+}
+
+function reviewApplication(application: ApplicationData, text: string, ruleSetId?: string) {
   const automatic = selectAutomaticRuleSet(reviewContextFromApplication(application), '2026-08-20T00:00:00.000Z')
   return verifyLabel({
     application,
@@ -55,6 +59,88 @@ describe('expanded distilled-spirits reviewer cards', () => {
     expect(outcome.checks.find((check) => check.id === 'spirits.age-statement')?.status).toBe('pass')
   })
 
+  it('passes a supported age understatement and explains why it is allowed', () => {
+    const outcome = review('imported-clear', importedText.replace('AGED 8 YEARS', 'AGED 7 YEARS'))
+    expect(outcome.checks.find((check) => check.id === 'spirits.age-statement')).toMatchObject({
+      status: 'pass',
+      explanation: expect.stringContaining('permissibly understates'),
+    })
+  })
+
+  it.each([
+    'AGED AT LEAST 7 YEARS',
+    'AGED A MINIMUM OF 7 YEARS',
+    'OVER 7 YEARS OLD',
+    'AGED NOT LESS THAN 7 YEARS',
+  ])('passes an allowable minimum-age form: %s', (ageStatement) => {
+    const outcome = review('imported-clear', importedText.replace('AGED 8 YEARS', ageStatement))
+    expect(outcome.checks.find((check) => check.id === 'spirits.age-statement')?.status).toBe('pass')
+  })
+
+  it('does not pass “over” wording when the packet supports only the stated value', () => {
+    const outcome = review('imported-clear', importedText.replace('AGED 8 YEARS', 'OVER 8 YEARS OLD'))
+    expect(outcome.checks.find((check) => check.id === 'spirits.age-statement')?.status).toBe('mismatch')
+  })
+
+  it('fails an age overstatement', () => {
+    const outcome = review('imported-clear', importedText.replace('AGED 8 YEARS', 'AGED 9 YEARS'))
+    expect(outcome.checks.find((check) => check.id === 'spirits.age-statement')).toMatchObject({
+      status: 'mismatch',
+      explanation: expect.stringContaining('overstates'),
+    })
+  })
+
+  it.each([
+    'AGED LESS THAN 8 YEARS',
+    'UNDER 8 YEARS OLD',
+    'AGED NOT MORE THAN 8 YEARS',
+  ])('fails prohibited maximum-age wording: %s', (ageStatement) => {
+    const outcome = review('imported-clear', importedText.replace('AGED 8 YEARS', ageStatement))
+    expect(outcome.checks.find((check) => check.id === 'spirits.age-statement')).toMatchObject({
+      status: 'mismatch',
+      explanation: expect.stringContaining('maximum-age'),
+    })
+  })
+
+  it('supports age evidence stated in days', () => {
+    const application = {
+      ...applicationFor('imported-clear'),
+      requiresAgeStatement: true,
+      productionFacts: 'Youngest applicable spirit aged 90 days.',
+    }
+    const outcome = reviewApplication(application, importedText.replace('AGED 8 YEARS', 'AGED 60 DAYS'))
+    expect(outcome.checks.find((check) => check.id === 'spirits.age-statement')?.status).toBe('pass')
+  })
+
+  it('does not allow an understatement that conflicts with a domestic straight-whisky identity', () => {
+    const outcome = review('valid', `
+      OLD TOM DISTILLERY
+      KENTUCKY STRAIGHT BOURBON WHISKEY
+      AGED 1 YEAR
+      45% Alc./Vol. (90 Proof)
+      750 mL
+      BOTTLED BY OLD TOM DISTILLERY, FRANKFORT, KENTUCKY
+      ${GOVERNMENT_WARNING}
+    `)
+    expect(outcome.checks.find((check) => check.id === 'spirits.age-statement')).toMatchObject({
+      status: 'mismatch',
+      explanation: expect.stringContaining('straight-whisky designation'),
+    })
+  })
+
+  it('allows a two-year domestic straight-whisky statement expressed as 24 months', () => {
+    const outcome = review('valid', `
+      OLD TOM DISTILLERY
+      KENTUCKY STRAIGHT BOURBON WHISKEY
+      AGED 24 MONTHS
+      45% Alc./Vol. (90 Proof)
+      750 mL
+      BOTTLED BY OLD TOM DISTILLERY, FRANKFORT, KENTUCKY
+      ${GOVERNMENT_WARNING}
+    `)
+    expect(outcome.checks.find((check) => check.id === 'spirits.age-statement')?.status).toBe('pass')
+  })
+
   it('fails a readable country-of-origin conflict', () => {
     const outcome = review('imported-origin-mismatch', importedText.replace('PRODUCT OF SCOTLAND', 'PRODUCT OF IRELAND'))
 
@@ -88,6 +174,27 @@ describe('expanded distilled-spirits reviewer cards', () => {
     expect(outcome.checks.find((check) => check.id === 'spirits.yellow-5')?.status).toBe('mismatch')
     expect(outcome.checks.find((check) => check.id === 'spirits.sulfites')?.status).toBe('mismatch')
     expect(outcome.checks.find((check) => check.id === 'spirits.aspartame')?.status).toBe('mismatch')
+  })
+
+  it('fails a readable specialty composition conflict', () => {
+    const outcome = review(
+      'conditional-disclosures',
+      conditionalText.replace('ORANGE LIQUEUR WITH NATURAL FLAVORS', 'ORANGE LIQUEUR WITH ARTIFICIAL FLAVORS'),
+    )
+    expect(outcome.checks.find((check) => check.id === 'spirits.specialty-composition')?.status).toBe('mismatch')
+  })
+
+  it('does not guess carmine when the packet only says that one of two color additives is present', () => {
+    const application = {
+      ...applicationFor('production-disclosures'),
+      formulaLabelingInstructions: 'AMERICAN WHISKEY WITH NATURAL FLAVORS',
+      productionFacts: 'Formula indicates a covered red color additive but does not identify which one.',
+    }
+    const outcome = reviewApplication(application, conditionalText)
+    expect(outcome.checks.find((check) => check.id === 'spirits.cochineal-carmine')).toMatchObject({
+      status: 'needs_review',
+      observed: expect.stringContaining('Missing context'),
+    })
   })
 
   it('surfaces absent permit and production facts as missing context', () => {
