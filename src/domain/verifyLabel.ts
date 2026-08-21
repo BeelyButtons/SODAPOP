@@ -23,6 +23,7 @@ import {
   selectAutomaticRuleSet,
   type RuleSetSelection,
 } from './ruleEngine'
+import { distilledSpiritsChecks } from './distilledSpiritsChecks'
 
 type VerificationInput = {
   application: ApplicationData
@@ -247,7 +248,9 @@ function alcoholCheck(expected: string, text: string): ReviewCheck {
     observed: observed || 'Not confidently found',
     explanation:
       status === 'pass'
-        ? 'ABV and proof match the application numerically.'
+        ? proofRequired
+          ? 'ABV and proof match the application numerically.'
+          : 'The detected ABV matches the application numerically.'
         : status === 'mismatch'
           ? 'The detected ABV or proof differs from the application.'
           : 'OCR did not confidently identify an alcohol statement. Confirm visually.',
@@ -391,20 +394,42 @@ export function verifyLabel(input: VerificationInput): ReviewOutcome {
   const ruleSelection = input.ruleSelection ?? selectAutomaticRuleSet(
     reviewContextFromApplication(input.application),
   )
-  const fullChecks: ReviewCheck[] = [
-    withDetectedHighlight(brandCheck),
-    withDetectedHighlight(classTypeCheck),
-    withDetectedHighlight(detectedAlcoholCheck),
-    withDetectedHighlight(netContentsCheck),
-    ...warningChecks(
+  const highlightedCoreChecks = {
+    brand: withDetectedHighlight(brandCheck),
+    classType: withDetectedHighlight(classTypeCheck),
+    alcohol: withDetectedHighlight(detectedAlcoholCheck),
+    netContents: withDetectedHighlight(netContentsCheck),
+  }
+  const [warningText, warningFormat] = warningChecks(
       input.ocrText,
       input.ocrConfidence,
       input.application.containerVolumeMl,
       warningHighlight,
       improperBoldBody,
-    ),
+    )
+  const coreChecks = {
+    ...highlightedCoreChecks,
+    warningText,
+    warningFormat,
+  }
+  const fullChecks: ReviewCheck[] = [
+    highlightedCoreChecks.brand,
+    highlightedCoreChecks.classType,
+    highlightedCoreChecks.alcohol,
+    highlightedCoreChecks.netContents,
+    warningText,
+    warningFormat,
   ]
-  const checks = ruleSelection.selectedRuleSetId === 'wine-under-7-ttb-routing'
+  const selectedRuleSetId = ruleSelection.selectedRuleSetId
+  const checks = selectedRuleSetId === 'distilled-spirits-domestic' || selectedRuleSetId === 'distilled-spirits-imported'
+    ? distilledSpiritsChecks({
+        application: input.application,
+        ocrText: input.ocrText,
+        ocrConfidence: input.ocrConfidence,
+        ruleSetId: selectedRuleSetId,
+        coreChecks,
+      }).map(withDetectedHighlight)
+    : selectedRuleSetId === 'wine-under-7-ttb-routing'
     ? fullChecks.filter((check) => check.id === 'warningText' || check.id === 'warningFormat')
     : fullChecks
 

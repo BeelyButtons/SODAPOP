@@ -1,8 +1,8 @@
 # SODAPOP post-rule-expansion specification
 
-Status: **Ready for project-owner review before routing or UI implementation**
+Status: **Approved; routing foundation and distilled-spirits card expansion implemented. Wine and malt-beverage cards remain pending.**
 
-This specification converts the approved TTB rule-family catalog into machine-readable records. It does not change the current reviewer interface or verification behavior.
+This specification converts the approved TTB rule-family catalog into machine-readable records. Its records now drive the routing foundation, rule-set transparency, and expanded domestic/imported distilled-spirits reviewer cards.
 
 ## Scope and authority
 
@@ -128,7 +128,7 @@ Rule-set selection must not extend the primary analysis path materially:
 
 The static rule records are small and may ship with the application. Lazy behavior applies to alternative ranking, detailed reference presentation, and any additional evidence work—not to the selected rule's correctness.
 
-## Acceptance criteria before routing implementation
+## Original acceptance criteria before routing implementation
 
 - Every rule ID is unique.
 - Every required fact exists in the application-data specification.
@@ -143,11 +143,10 @@ The static rule records are small and may ship with the application. Lazy behavi
 
 ## Implementation sequence after approval
 
-1. Implement a tri-state applicability evaluator: applies, does not apply, or missing context.
-2. Implement automatic base rule-set selection and ranked alternatives.
-3. Adapt the existing distilled-spirits review packet to the expanded application-data contract.
-4. Expand distilled-spirits checks and regression tests without changing the established staff decision rule.
-5. Add the sticky rule-set control, detail dialog, full reference route, override, and cached reanalysis.
-6. Validate the five-second budget on clean and difficult images.
-7. Add the wine and malt rule engines in reviewed increments.
-
+1. Completed — tri-state applicability evaluator: applies, does not apply, or missing context.
+2. Completed — automatic base rule-set selection and ranked alternatives.
+3. Completed — expanded distilled-spirits review-packet contract.
+4. Completed — domestic/imported distilled-spirits checks and regression cases without changing the staff decision rule.
+5. Completed — sticky rule-set control, detail dialog, full reference route, override, and cached reanalysis.
+6. In continuous validation — five-second budget on clear and difficult images.
+7. Pending — wine and malt rule engines in reviewed increments.

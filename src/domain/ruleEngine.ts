@@ -150,10 +150,39 @@ export function reviewContextFromApplication(application: ApplicationData): Revi
     alcoholContent: alcohol ?? undefined,
     containerVolumeMl: application.containerVolumeMl,
     brandName: application.brandName,
+    applicationType: application.applicationType,
+    distinctiveBottleRequested: application.distinctiveBottleRequested,
+    destinationState: application.destinationState,
+    fancifulName: application.fancifulName,
+    applicantName: application.applicantName,
+    applicantAddress: application.applicantAddress,
+    permitName: application.permitName,
+    permitAddress: application.permitAddress,
+    formulaRequired: application.formulaRequired,
+    formulaId: application.formulaId,
+    formulaClassType: application.formulaClassType,
+    formulaCompositionStatement: application.formulaCompositionStatement,
+    formulaLabelingInstructions: application.formulaLabelingInstructions,
     labelClassType: application.classType,
     netContents: application.netContents,
+    labelDimensions: application.labelDimensions,
+    labelSet: application.labelSet,
+    bottleMarkings: application.bottleMarkings,
+    bottleDesignEvidence: application.bottleDesignEvidence,
     labelAlcoholStatementPresent: true,
-    labelSet: true,
+    containsSignificantSolids: application.containsSignificantSolids,
+    containsNeutralSpirits: application.containsNeutralSpirits,
+    requiresAgeStatement: application.requiresAgeStatement,
+    spiritsAgeOrMaturityClaim: application.spiritsAgeOrMaturityClaim,
+    requiresWoodTreatmentDisclosure: application.requiresWoodTreatmentDisclosure,
+    requiresStateOfDistillation: application.requiresStateOfDistillation,
+    containsYellow5: application.containsYellow5,
+    containsCochinealOrCarmine: application.containsCochinealOrCarmine,
+    sulfitesPpm: application.sulfitesPpm,
+    containsAspartame: application.containsAspartame,
+    importCountryOfOrigin: application.importCountryOfOrigin,
+    importBottlingDisposition: application.importBottlingDisposition,
+    productionFacts: application.productionFacts,
   }
 }
 
@@ -266,4 +295,3 @@ export function rankAlternativeRuleSets(context: ReviewContext, currentRuleSetId
     })
     .sort((left, right) => right.score - left.score || left.ruleSet.label.localeCompare(right.ruleSet.label))
 }
-

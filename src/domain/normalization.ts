@@ -75,7 +75,7 @@ export function bestObservedLine(expected: string, text: string) {
 }
 
 export function parseAlcohol(value: string) {
-  const abvMatch = value.match(/(\d{1,3}(?:\.\d+)?)\s*%/i)
+  const abvMatch = value.match(/(\d{1,3}(?:\.\d+)?)\s*(?:%|percent(?:\s+alcohol\s+by\s+volume)?)/i)
   const proofMatch = value.match(/(\d{1,3}(?:\.\d+)?)\s*proof/i)
   return {
     abv: abvMatch ? Number(abvMatch[1]) : null,
@@ -85,6 +85,7 @@ export function parseAlcohol(value: string) {
 
 export function findAlcohol(value: string) {
   const match = value.match(/\d{1,3}(?:\.\d+)?\s*%[^\n]{0,40}(?:\d{1,3}(?:\.\d+)?\s*proof)?/i)
+    ?? value.match(/(?:bottled\s+at\s+)?\d{1,3}(?:\.\d+)?\s+percent\s+alcohol\s+by\s+volume/i)
   return match?.[0]?.trim() ?? ''
 }
 

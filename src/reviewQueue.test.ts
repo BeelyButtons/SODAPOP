@@ -69,7 +69,7 @@ describe('review queue', () => {
       ['valid', 'pass'], ['wrong-abv', 'fail'], ['warning-case', 'pass'], ['warning-bold', 'pass'],
       ['missing-warning', 'fail'], ['angled-photo', 'pass'], ['glare-photo', 'pass'], ['upside-down', 'pass'],
     ])
-    expect(nextRemainingSample(progress, 'upside-down')?.id).toBe('dark-label')
+    expect(nextRemainingSample(progress, 'upside-down')?.id).toBe('imported-clear')
   })
 
   it('creates immutable revisions and points the queue to the latest decision', () => {

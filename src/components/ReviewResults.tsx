@@ -16,8 +16,8 @@ const MAX_ZOOM = 200
 const ZOOM_STEP = 10
 
 function requirementsFor(check: ReviewCheck) {
-  if (check.id !== 'warningFormat') return undefined
   if (check.requirements?.length) return check.requirements
+  if (check.id !== 'warningFormat') return undefined
 
   const minimumTypeSize = check.expected.match(/at least ([\d.]+) mm/i)?.[1]
   const maximumDensity = check.expected.match(/no more than ([\d.]+) characters per inch/i)?.[1]
@@ -119,8 +119,8 @@ function CheckCard({
       </div>
 
       {requirements && (
-        <section className="warning-format-requirements" aria-label="Government warning format requirements">
-          <strong>Requirements to verify</strong>
+        <section className="warning-format-requirements" aria-label={`${check.label} requirements`}>
+          <strong>{check.requirementsLabel ?? 'Requirements to verify'}</strong>
           <ul>
             {requirements.map((requirement) => <li key={requirement}>{requirement}</li>)}
           </ul>

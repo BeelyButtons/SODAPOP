@@ -17,7 +17,7 @@ SODAPOP — System for Optical Detection, Analysis & Packaging-Oversight Process
 - Staff Pass/Fail determination for every reviewed item: working
 - Final decision rule and submission control: working
 - Synthetic compliant, failure, varied-layout, and difficult-photo cases: included
-- Local OCR benchmark: 0.6–1.1 seconds on the included 1400×1900 samples after local testing
+- Expanded-case local benchmark: 3.6–4.9 seconds on clear, conditional, blurred, and obstructed samples with a warm OCR engine
 - Coordinate-backed label highlighting: working
 - Angled-label deskewing and orientation-aware highlights: working
 - Conditional glare and alternate-orientation OCR retries: working
@@ -25,6 +25,8 @@ SODAPOP — System for Optical Detection, Analysis & Packaging-Oversight Process
 - Automated verification: routing, interface, OCR, decision-workflow, GitHub Pages production-build, and lint checks passing
 - Post-rule-expansion routing foundation: working, with seven TTB review/routing rule sets, tri-state applicability, automatic selection, transparent selection reasons, and reviewer overrides
 - Cached-evidence rule-set reanalysis: working without a second OCR pass; alternative rule sets are ranked only when the reviewer opens the rule control
+- Expanded distilled-spirits review: working for domestic/imported base requirements and conditional formula, exemption, bottle, composition, age, production, color, sulfite, and aspartame branches
+- Distilled-spirits regression queue: 20 cases spanning clear matches, explicit conflicts, missing context, incorrect routing, formula disclosures, glare, blur, low contrast, perspective, rotation, and partial obstruction
 - Batch review: planned after the single-label workflow is validated
 - Live URL: [https://beelybuttons.github.io/SODAPOP/](https://beelybuttons.github.io/SODAPOP/)
 
@@ -53,6 +55,8 @@ SODAPOP — System for Optical Detection, Analysis & Packaging-Oversight Process
 21. Selects a TTB rule set from the COLA application context: beverage type, domestic/imported source, and wine alcohol content.
 22. Shows the applied rule set and its selection reasons in the sticky review bar, with per-rule `Applies`, `Does not apply`, or `Missing context` status.
 23. Lets staff inspect a full rule reference in a separate browser tab, override a mistaken selection, and rerun deterministic analysis from cached OCR and image evidence.
+24. Produces a staff Pass/Fail card for every applicable distilled-spirits rule instead of limiting review to the original six comparisons.
+25. Recommends Pass or Mismatch when packet and readable artwork evidence support that result; it uses Human review only when context or visible evidence is genuinely unresolved.
 
 The application uses meaningful browser routes even though it remains a client-side SPA:
 
@@ -67,7 +71,7 @@ The application uses meaningful browser routes even though it remains a client-s
 
 GitHub Pages receives a `404.html` copy of the SPA entry point so direct links and browser refreshes can return to the appropriate client-side route. Results are intentionally session-only; directly opening `/results` without an active review returns the user to `/review`.
 
-The included synthetic cases demonstrate a matching label, incorrect ABV, incorrect warning capitalization, improperly bold warning body text, a missing warning, varied label layouts, reverse light-on-dark type, an angled tabletop photograph, and glare/low contrast.
+The included synthetic cases demonstrate a matching label, incorrect ABV, incorrect warning capitalization, improperly bold warning body text, a missing warning, varied layouts, reverse type, perspective, rotation, glare, blur, partial obstruction, domestic and imported routing, a country-of-origin conflict, deliberately incorrect routing, missing packet context, complete and missing formula disclosures, significant solids, neutral spirits, wood treatment, State of distillation, carmine, intrastate exemption wording, and distinctive-bottle evidence.
 
 ## Product direction and iterative improvement
 
@@ -82,6 +86,8 @@ The project owner defined all work through the current distilled-spirits experie
 Before changing the interface or verification behavior, the approved research catalog was converted into a formal specification in [`docs/post-rule-expansion-specification.md`](docs/post-rule-expansion-specification.md) and `src/domain/ruleSpecification.ts`. It defines one record per reviewer-facing rule, the application/formula/supporting facts needed to decide applicability, seven initial regulatory rule sets, explicit missing-context behavior, and integrity tests. Wine below 7 percent alcohol by volume is represented as a TTB jurisdiction-routing branch without implementing FDA rules.
 
 The project owner's reviewer safeguard is now implemented: the selected rule set is visible in the sticky decision bar, explains why it was selected, provides a separate full-reference view, and permits a deliberate reviewer override followed by reanalysis. The project owner specifically required protection against an incorrectly inferred branch without slowing routine work. SODAPOP therefore ranks alternatives only when the reviewer opens the control, clearly warns about conflicts with the application facts, clears stale card decisions when the rule set changes, and reuses cached OCR text, word coordinates, and image evidence. This keeps transparency and correction available without adding another expensive OCR pass or burdening the initial five-second analysis target.
+
+The project owner next required actual domestic and imported distilled-spirits cards and a regression queue that resembles real review conditions instead of repeating clean, nearly identical artwork. Combining regulatory branches with image defects exposed an unnecessary retry loop: an obstructed label had already yielded four of five core evidence groups, but OCR kept rescanning for the covered field and took 12.9 seconds. The quality gate now stops that high-confidence partial pass, surfaces the covered field for staff review, and completed the same case in 3.8 seconds during local validation.
 
 ### Review queue and accessibility improvements
 
@@ -136,6 +142,7 @@ Application values → validation → deterministic comparison rules → review 
 - **Tesseract.js:** zero-cost local OCR with no external ML endpoint at review time.
 - **Deterministic verification:** exact and numeric regulatory checks do not depend on generative-model judgment.
 - **Quality-gated retries:** extra OCR work is performed only when expected label evidence remains incomplete.
+- **Rule-driven distilled-spirits evaluation:** applicable formal rules become evidence cards using COLA, formula, permit, production, and OCR facts.
 - **No database or accounts:** only demonstration-queue decisions are persisted in browser storage; images and extracted label content remain in memory.
 - **Static deployment:** the current slice can run on GitHub Pages without a paid backend.
 
@@ -153,6 +160,12 @@ The real process uses COLAs Online or [TTB Form 5100.31](https://www.ttb.gov/med
 - Label artwork
 - Beverage type (distilled spirits, wine, or malt beverage)
 - Domestic or imported source
+- COLA/exemption application type and destination State
+- Applicant and permit name/address context
+- Formula identity, class/type, composition, and labeling instructions
+- Complete-label, container-marking, label-dimension, and distinctive-bottle evidence
+- Imported country-of-origin and bottling-disposition facts
+- Conditional composition and production facts for solids, neutral spirits, age, wood treatment, State of distillation, color additives, sulfites, and aspartame
 
 Class/type is included because it is part of the exercise’s expected review, even though it is not necessarily entered as an independent field on every current COLA application. A future integration should map from the authoritative COLAs Online data contract rather than this prototype form.
 
@@ -229,7 +242,7 @@ public/ocr/          Same-origin OCR worker, runtime, and language assets
 
 ## Assumptions and limitations
 
-- Automatic rule-set routing now covers distilled spirits, wine, and malt beverages. The current reviewer-card implementation remains the pre-expansion distilled-spirits set except for the explicit under-7%-wine TTB warning/routing branch; the full beverage-specific card expansion is the next phase.
+- Automatic rule-set routing covers distilled spirits, wine, and malt beverages. Distilled-spirits cards are expanded for domestic/imported base and conditional rules. Wine and malt-beverage cards remain future increments except for the explicit under-7%-wine TTB warning/routing branch.
 - This prototype uses manual application entry. Batch CSV input comes next.
 - OCR accuracy still depends on image quality. Included glare, perspective, upside-down, varied-layout, and reverse-type fixtures expose these limitations for staff evaluation and regression testing.
 - The five-second result is a development-machine measurement on synthetic fixtures, not a service-level guarantee.
@@ -243,8 +256,8 @@ The current implementation has no application runtime fee: all processing is loc
 
 ## Next increment
 
-1. Review the implemented routing, visible rule-set explanation, full-reference route, manual override, and cached-evidence reanalysis in the single-label workflow.
-2. Expand the actual domestic and imported distilled-spirits review cards and regression tests from the approved specification.
-3. Validate the five-second target on clean and difficult images with the expanded distilled-spirits cards.
-4. Add wine and malt-beverage cards in reviewed increments, preserving automatic routing, tri-state applicability, cached evidence, and staff Pass/Fail for every applicable item.
+1. Project-owner review of the expanded domestic/imported distilled-spirits cards and 20-case regression queue.
+2. Refine any recommendation or sample that hands-on review exposes as misleading, overly confident, or unnecessarily manual.
+3. Expand wine cards in reviewed increments, including the 7-percent TTB jurisdiction boundary and imported/domestic branches.
+4. Expand malt-beverage cards while preserving automatic routing, tri-state applicability, cached evidence, and staff Pass/Fail for every applicable item.
 5. Return to batch intake and export only after the single-label rule-expanded workflow is accepted.

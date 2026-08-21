@@ -301,6 +301,11 @@ type RecognitionPass = {
   rotatedHeight: number
 }
 
+export function shouldRetryRecognition(score: number, confidence: number) {
+  if (score < 3.75) return true
+  return score < 4.35 && confidence < 75
+}
+
 async function imageDimensions(source: string | null, fallback: HTMLCanvasElement) {
   if (!source) return { width: fallback.width, height: fallback.height }
   const image = new Image()
@@ -359,7 +364,8 @@ export async function recognizeLabel(
       attemptedOrientations.add(Math.PI)
     }
 
-    if (Math.max(...passes.map((pass) => pass.score)) < 4.35) {
+    const leadingPass = passes.reduce((winner, candidate) => candidate.score > winner.score ? candidate : winner)
+    if (shouldRetryRecognition(leadingPass.score, leadingPass.confidence)) {
       onProgress({ progress: 30, message: 'Improving difficult text' })
       const enhanced = prepared.enhanced()
       passes.push(await runPass(worker, enhanced, application, { rotateAuto: true }))

@@ -10,6 +10,17 @@ type SampleVariant =
   | 'glare-photo'
   | 'dark-label'
   | 'upside-down'
+  | 'imported-clear'
+  | 'imported-origin-mismatch'
+  | 'conditional-disclosures'
+  | 'conditional-missing'
+  | 'blur-photo'
+  | 'partial-obstruction'
+  | 'missing-context'
+  | 'routing-override'
+  | 'production-disclosures'
+  | 'significant-solids'
+  | 'exemption-distinctive'
 
 export type SampleLabel = {
   id: SampleVariant
@@ -25,6 +36,12 @@ const EMBER_APPLICATION: ApplicationData = {
   alcoholContent: '50% Alc./Vol. (100 Proof)',
   netContents: '750 mL',
   containerVolumeMl: 750,
+  applicantName: 'EMBER & ASH DISTILLING',
+  applicantAddress: 'LOUISVILLE, KENTUCKY',
+  permitName: 'EMBER & ASH DISTILLING',
+  permitAddress: 'LOUISVILLE, KENTUCKY',
+  spiritsAgeOrMaturityClaim: false,
+  productionFacts: 'Straight rye whisky production facts verified; no optional age claim.',
 }
 
 const HARBOR_APPLICATION: ApplicationData = {
@@ -34,6 +51,12 @@ const HARBOR_APPLICATION: ApplicationData = {
   alcoholContent: '42% Alc./Vol. (84 Proof)',
   netContents: '1 L',
   containerVolumeMl: 1_000,
+  applicantName: 'HARBOR LIGHT SPIRITS',
+  applicantAddress: 'PORTLAND, MAINE',
+  permitName: 'HARBOR LIGHT SPIRITS',
+  permitAddress: 'PORTLAND, MAINE',
+  spiritsAgeOrMaturityClaim: false,
+  productionFacts: 'American dry gin production facts verified.',
 }
 
 const ORCHARD_APPLICATION: ApplicationData = {
@@ -43,6 +66,130 @@ const ORCHARD_APPLICATION: ApplicationData = {
   alcoholContent: '40% Alc./Vol. (80 Proof)',
   netContents: '375 mL',
   containerVolumeMl: 375,
+  applicantName: 'NIGHT ORCHARD SPIRITS',
+  applicantAddress: 'HUDSON, NEW YORK',
+  permitName: 'NIGHT ORCHARD SPIRITS',
+  permitAddress: 'HUDSON, NEW YORK',
+  spiritsAgeOrMaturityClaim: false,
+  productionFacts: 'Apple brandy production facts verified.',
+}
+
+const IMPORTED_APPLICATION: ApplicationData = {
+  ...INITIAL_APPLICATION,
+  source: 'imported',
+  brandName: 'NORTH SEA RESERVE',
+  classType: 'SINGLE MALT SCOTCH WHISKY',
+  alcoholContent: '46% Alc./Vol. (92 Proof)',
+  netContents: '700 mL',
+  containerVolumeMl: 700,
+  applicantName: 'ATLANTIC IMPORTS LLC',
+  applicantAddress: 'BALTIMORE, MARYLAND',
+  permitName: 'ATLANTIC IMPORTS LLC',
+  permitAddress: 'BALTIMORE, MARYLAND',
+  importCountryOfOrigin: 'SCOTLAND',
+  importBottlingDisposition: 'Imported in the labeled bottle',
+  requiresAgeStatement: false,
+  spiritsAgeOrMaturityClaim: true,
+  productionFacts: 'Youngest applicable spirit aged 8 years. Reserve brand wording supported by the product identity.',
+}
+
+const CONDITIONAL_APPLICATION: ApplicationData = {
+  ...INITIAL_APPLICATION,
+  brandName: 'CITRUS FORGE',
+  classType: 'DISTILLED SPIRITS SPECIALTY',
+  fancifulName: 'GOLDEN CITRUS',
+  alcoholContent: '30% Alc./Vol. (60 Proof)',
+  netContents: '750 mL',
+  formulaRequired: true,
+  formulaId: 'SDS-2026-1042',
+  formulaClassType: 'DISTILLED SPIRITS SPECIALTY',
+  formulaCompositionStatement: 'ORANGE LIQUEUR WITH NATURAL FLAVORS',
+  formulaLabelingInstructions: 'ORANGE LIQUEUR WITH NATURAL FLAVORS|CONTAINS FD&C YELLOW NO. 5|CONTAINS SULFITES|PHENYLKETONURICS: CONTAINS PHENYLALANINE',
+  applicantName: 'CITRUS FORGE SPIRITS',
+  applicantAddress: 'TAMPA, FLORIDA',
+  permitName: 'CITRUS FORGE SPIRITS',
+  permitAddress: 'TAMPA, FLORIDA',
+  containsYellow5: true,
+  sulfitesPpm: 18,
+  containsAspartame: true,
+  spiritsAgeOrMaturityClaim: false,
+  productionFacts: 'Approved specialty formula and composition facts verified.',
+}
+
+const MISSING_CONTEXT_APPLICATION: ApplicationData = {
+  productType: 'distilled_spirits',
+  source: 'domestic',
+  brandName: 'PACKET GAP',
+  classType: 'VODKA',
+  alcoholContent: '40% Alc./Vol. (80 Proof)',
+  netContents: '750 mL',
+  containerVolumeMl: 750,
+  applicationType: 'cola',
+  labelSet: true,
+}
+
+const ROUTING_OVERRIDE_APPLICATION: ApplicationData = {
+  ...IMPORTED_APPLICATION,
+  source: 'domestic',
+  brandName: 'ROUTING CHECK',
+}
+
+const PRODUCTION_DISCLOSURE_APPLICATION: ApplicationData = {
+  ...INITIAL_APPLICATION,
+  brandName: 'WOODLAND PROOF',
+  classType: 'AMERICAN WHISKEY SPECIALTY',
+  alcoholContent: '40% Alc./Vol. (80 Proof)',
+  formulaRequired: true,
+  formulaId: 'SDS-2026-1188',
+  formulaClassType: 'AMERICAN WHISKEY SPECIALTY',
+  formulaCompositionStatement: 'AMERICAN WHISKEY WITH NATURAL FLAVORS',
+  formulaLabelingInstructions: 'AMERICAN WHISKEY WITH NATURAL FLAVORS|50% NEUTRAL SPIRITS DISTILLED FROM CORN|COLORED AND FLAVORED WITH OAK CHIPS|DISTILLED IN KENTUCKY|CONTAINS CARMINE',
+  applicantName: 'WOODLAND PROOF DISTILLING',
+  applicantAddress: 'LEXINGTON, KENTUCKY',
+  permitName: 'WOODLAND PROOF DISTILLING',
+  permitAddress: 'LEXINGTON, KENTUCKY',
+  containsNeutralSpirits: true,
+  requiresWoodTreatmentDisclosure: true,
+  requiresStateOfDistillation: true,
+  containsCochinealOrCarmine: true,
+  spiritsAgeOrMaturityClaim: false,
+  productionFacts: 'Wood treatment disclosure: COLORED AND FLAVORED WITH OAK CHIPS. State of distillation: DISTILLED IN KENTUCKY. Neutral spirits and color facts verified by formula.',
+}
+
+const SIGNIFICANT_SOLIDS_APPLICATION: ApplicationData = {
+  ...INITIAL_APPLICATION,
+  brandName: 'ORCHARD ORBIT',
+  classType: 'CHERRY LIQUEUR',
+  alcoholContent: '24% Alc./Vol.',
+  formulaRequired: true,
+  formulaId: 'SDS-2026-1201',
+  formulaClassType: 'DISTILLED SPIRITS SPECIALTY',
+  formulaCompositionStatement: 'CHERRY LIQUEUR WITH WHOLE CHERRIES',
+  formulaLabelingInstructions: 'CHERRY LIQUEUR WITH WHOLE CHERRIES',
+  applicantName: 'ORCHARD ORBIT SPIRITS',
+  applicantAddress: 'TRAVERSE CITY, MICHIGAN',
+  permitName: 'ORCHARD ORBIT SPIRITS',
+  permitAddress: 'TRAVERSE CITY, MICHIGAN',
+  containsSignificantSolids: true,
+  spiritsAgeOrMaturityClaim: false,
+  productionFacts: 'Whole cherries remain in the container; bottling strength is 24 percent alcohol by volume.',
+}
+
+const EXEMPTION_DISTINCTIVE_APPLICATION: ApplicationData = {
+  ...INITIAL_APPLICATION,
+  brandName: 'COMMONWEALTH',
+  classType: 'VODKA',
+  alcoholContent: '40% Alc./Vol. (80 Proof)',
+  applicationType: 'exemption',
+  destinationState: 'VIRGINIA',
+  distinctiveBottleRequested: true,
+  bottleDesignEvidence: 'Front, back, side, closure, and dimensional bottle views supplied and internally consistent.',
+  applicantName: 'COMMONWEALTH SPIRITS',
+  applicantAddress: 'RICHMOND, VIRGINIA',
+  permitName: 'COMMONWEALTH SPIRITS',
+  permitAddress: 'RICHMOND, VIRGINIA',
+  spiritsAgeOrMaturityClaim: false,
+  productionFacts: 'Domestic vodka for intrastate Virginia sale; distinctive bottle packet complete.',
 }
 
 export const SAMPLE_LABELS: SampleLabel[] = [
@@ -99,6 +246,72 @@ export const SAMPLE_LABELS: SampleLabel[] = [
     name: 'Upside-down photo',
     description: 'A complete label rotated 180 degrees to verify orientation recovery.',
     application: INITIAL_APPLICATION,
+  },
+  {
+    id: 'imported-clear',
+    name: 'Imported spirits — complete',
+    description: 'Clear imported whisky with matching importer, country of origin, and age evidence.',
+    application: IMPORTED_APPLICATION,
+  },
+  {
+    id: 'imported-origin-mismatch',
+    name: 'Imported origin conflict',
+    description: 'The packet says Scotland while the readable label says Product of Ireland.',
+    application: IMPORTED_APPLICATION,
+  },
+  {
+    id: 'conditional-disclosures',
+    name: 'Formula disclosures — complete',
+    description: 'A specialty liqueur with formula wording, Yellow No. 5, sulfites, and aspartame declarations.',
+    application: CONDITIONAL_APPLICATION,
+  },
+  {
+    id: 'conditional-missing',
+    name: 'Formula disclosures — missing',
+    description: 'The same formula packet with required conditional declarations omitted from the artwork.',
+    application: CONDITIONAL_APPLICATION,
+  },
+  {
+    id: 'blur-photo',
+    name: 'Motion blur photograph',
+    description: 'A domestic rye label softened by camera motion to test evidence uncertainty.',
+    application: EMBER_APPLICATION,
+  },
+  {
+    id: 'partial-obstruction',
+    name: 'Partially obstructed import label',
+    description: 'A foreground obstruction covers part of the imported-product evidence.',
+    application: IMPORTED_APPLICATION,
+  },
+  {
+    id: 'missing-context',
+    name: 'Incomplete review packet',
+    description: 'Readable artwork paired with intentionally missing permit, formula, production, and layout context.',
+    application: MISSING_CONTEXT_APPLICATION,
+  },
+  {
+    id: 'routing-override',
+    name: 'Incorrect automatic rule set',
+    description: 'An imported label is intentionally marked domestic so staff can test the rule-set override safeguard.',
+    application: ROUTING_OVERRIDE_APPLICATION,
+  },
+  {
+    id: 'production-disclosures',
+    name: 'Production disclosures — complete',
+    description: 'Formula-backed neutral spirits, wood treatment, State of distillation, and carmine statements.',
+    application: PRODUCTION_DISCLOSURE_APPLICATION,
+  },
+  {
+    id: 'significant-solids',
+    name: 'Significant solids alcohol statement',
+    description: 'A cherry liqueur using the special bottling-strength wording required for substantial solids.',
+    application: SIGNIFICANT_SOLIDS_APPLICATION,
+  },
+  {
+    id: 'exemption-distinctive',
+    name: 'Intrastate exemption and bottle evidence',
+    description: 'A domestic exemption label with its State limitation and a complete distinctive-bottle packet.',
+    application: EXEMPTION_DISTINCTIVE_APPLICATION,
   },
 ]
 
@@ -167,7 +380,7 @@ function emberLabel() {
     <text x="1585" y="430" text-anchor="end" font-family="Arial, sans-serif" font-size="43" font-weight="700" fill="#fff4df">750 mL</text>
     <rect x="90" y="505" width="1520" height="335" rx="10" fill="#f8f0e4"/>
     ${warningMarkup('angled-photo', { x: 115, y: 590, size: 29, lineHeight: 52 })}
-    <text x="115" y="970" font-family="Arial, sans-serif" font-size="29" fill="#e9c497">DISTILLED AND BOTTLED IN LOUISVILLE, KENTUCKY</text>
+    <text x="115" y="970" font-family="Arial, sans-serif" font-size="29" fill="#e9c497">DISTILLED AND BOTTLED BY EMBER &amp; ASH DISTILLING, LOUISVILLE, KENTUCKY</text>
   </svg>`
 }
 
@@ -183,6 +396,7 @@ function harborLabel() {
     <text x="1200" y="795" text-anchor="end" font-family="Arial, sans-serif" font-size="39" font-weight="700">1 L</text>
     <rect x="70" y="845" width="1160" height="325" rx="12" fill="#fff" stroke="#184e54" stroke-width="4"/>
     ${warningMarkup('glare-photo', { x: 90, y: 920, size: 24, lineHeight: 44 })}
+    <text x="650" y="1235" text-anchor="middle" font-family="Arial, sans-serif" font-size="23">BOTTLED BY HARBOR LIGHT SPIRITS, PORTLAND, MAINE</text>
   </svg>`
 }
 
@@ -200,10 +414,87 @@ function orchardLabel() {
   </svg>`
 }
 
+function expandedRuleLabel(variant: SampleVariant) {
+  const imported = variant === 'imported-clear' || variant === 'imported-origin-mismatch' || variant === 'partial-obstruction' || variant === 'routing-override'
+  const conditional = variant === 'conditional-disclosures' || variant === 'conditional-missing'
+  const missingContext = variant === 'missing-context'
+  const brand = conditional ? 'CITRUS FORGE' : missingContext ? 'PACKET GAP' : imported ? (variant === 'routing-override' ? 'ROUTING CHECK' : 'NORTH SEA RESERVE') : 'EMBER & ASH'
+  const classType = conditional ? 'DISTILLED SPIRITS SPECIALTY' : missingContext ? 'VODKA' : imported ? 'SINGLE MALT SCOTCH WHISKY' : 'STRAIGHT RYE WHISKEY'
+  const alcohol = conditional ? '30% Alc./Vol. (60 Proof)' : missingContext ? '40% Alc./Vol. (80 Proof)' : imported ? '46% Alc./Vol. (92 Proof)' : '50% Alc./Vol. (100 Proof)'
+  const volume = imported ? '700 mL' : '750 mL'
+  const origin = variant === 'imported-origin-mismatch' ? 'PRODUCT OF IRELAND' : 'PRODUCT OF SCOTLAND'
+  const responsibility = imported
+    ? 'IMPORTED BY ATLANTIC IMPORTS LLC, BALTIMORE, MARYLAND'
+    : conditional
+      ? 'BOTTLED BY CITRUS FORGE SPIRITS, TAMPA, FLORIDA'
+      : missingContext
+        ? 'BOTTLED BY PACKET GAP SPIRITS, DENVER, COLORADO'
+        : 'DISTILLED AND BOTTLED BY EMBER & ASH DISTILLING, LOUISVILLE, KENTUCKY'
+  const conditionalStatements = conditional && variant !== 'conditional-missing'
+    ? `<text x="90" y="880" font-family="Arial, sans-serif" font-size="27" font-weight="700">GOLDEN CITRUS</text>
+       <text x="90" y="925" font-family="Arial, sans-serif" font-size="25">ORANGE LIQUEUR WITH NATURAL FLAVORS</text>
+       <text x="90" y="970" font-family="Arial, sans-serif" font-size="23">CONTAINS FD&amp;C YELLOW NO. 5 · CONTAINS SULFITES</text>
+       <text x="90" y="1015" font-family="Arial, sans-serif" font-size="22" font-weight="700">PHENYLKETONURICS: CONTAINS PHENYLALANINE</text>`
+    : ''
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="1800" viewBox="0 0 1500 1800">
+    <defs><linearGradient id="rule-bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${conditional ? '#f5d875' : imported ? '#d9e4e2' : '#eadbc4'}"/><stop offset="1" stop-color="${conditional ? '#e49b40' : imported ? '#9cbab7' : '#b88660'}"/></linearGradient></defs>
+    <rect width="1500" height="1800" fill="url(#rule-bg)"/>
+    <rect x="45" y="45" width="1410" height="1710" rx="24" fill="rgba(255,255,255,.72)" stroke="#173d31" stroke-width="7"/>
+    <text x="750" y="205" text-anchor="middle" font-family="Georgia, serif" font-size="96" font-weight="700" fill="#173d31">${escapeXml(brand)}</text>
+    <text x="750" y="300" text-anchor="middle" font-family="Arial, sans-serif" font-size="43" letter-spacing="4">${escapeXml(classType)}</text>
+    <path d="M100 355 H1400" stroke="#8b642b" stroke-width="4"/>
+    <text x="105" y="455" font-family="Arial, sans-serif" font-size="39" font-weight="700">${alcohol}</text>
+    <text x="1395" y="455" text-anchor="end" font-family="Arial, sans-serif" font-size="39" font-weight="700">${volume}</text>
+    ${imported ? `<text x="105" y="545" font-family="Arial, sans-serif" font-size="34" font-weight="700">AGED 8 YEARS</text><text x="1395" y="545" text-anchor="end" font-family="Arial, sans-serif" font-size="34" font-weight="700">${origin}</text>` : ''}
+    ${conditionalStatements}
+    <rect x="75" y="1115" width="1350" height="350" rx="10" fill="#fffdf8" stroke="#173d31" stroke-width="3"/>
+    ${warningMarkup(variant, { x: 95, y: 1200, size: 27, lineHeight: 50 })}
+    <text x="750" y="1570" text-anchor="middle" font-family="Arial, sans-serif" font-size="27">${escapeXml(responsibility)}</text>
+  </svg>`
+}
+
+function additionalConditionalLabel(variant: SampleVariant) {
+  const production = variant === 'production-disclosures'
+  const solids = variant === 'significant-solids'
+  const brand = production ? 'WOODLAND PROOF' : solids ? 'ORCHARD ORBIT' : 'COMMONWEALTH'
+  const classType = production ? 'AMERICAN WHISKEY SPECIALTY' : solids ? 'CHERRY LIQUEUR' : 'VODKA'
+  const alcohol = production ? '40% Alc./Vol. (80 Proof)' : solids ? 'BOTTLED AT 24 PERCENT ALCOHOL BY VOLUME' : '40% Alc./Vol. (80 Proof)'
+  const responsibility = production
+    ? 'BOTTLED BY WOODLAND PROOF DISTILLING, LEXINGTON, KENTUCKY'
+    : solids
+      ? 'BOTTLED BY ORCHARD ORBIT SPIRITS, TRAVERSE CITY, MICHIGAN'
+      : 'BOTTLED BY COMMONWEALTH SPIRITS, RICHMOND, VIRGINIA'
+  const disclosures = production
+    ? [
+        'AMERICAN WHISKEY WITH NATURAL FLAVORS',
+        '50% NEUTRAL SPIRITS DISTILLED FROM CORN',
+        'COLORED AND FLAVORED WITH OAK CHIPS',
+        'DISTILLED IN KENTUCKY · CONTAINS CARMINE',
+      ]
+    : solids
+      ? ['CHERRY LIQUEUR WITH WHOLE CHERRIES', 'WHOLE CHERRIES IN CONTAINER']
+      : ['FOR SALE IN VIRGINIA ONLY', 'DISTINCTIVE BOTTLE APPLICATION NO. 9']
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="1800" viewBox="0 0 1500 1800">
+    <rect width="1500" height="1800" fill="${production ? '#d8c7a4' : solids ? '#ead7dc' : '#dce5ef'}"/>
+    <path d="M0 300 Q500 40 1000 260 T1500 180 V0 H0Z" fill="${production ? '#33543e' : solids ? '#7b243d' : '#263f64'}" opacity=".96"/>
+    <rect x="48" y="48" width="1404" height="1704" rx="28" fill="none" stroke="#172f28" stroke-width="7"/>
+    <text x="750" y="230" text-anchor="middle" font-family="Georgia, serif" font-size="96" font-weight="700" fill="#fff">${escapeXml(brand)}</text>
+    <text x="750" y="365" text-anchor="middle" font-family="Arial, sans-serif" font-size="43" letter-spacing="4">${escapeXml(classType)}</text>
+    <text x="95" y="465" font-family="Arial, sans-serif" font-size="37" font-weight="700">${alcohol}</text>
+    <text x="1405" y="465" text-anchor="end" font-family="Arial, sans-serif" font-size="37" font-weight="700">750 mL</text>
+    ${disclosures.map((line, index) => `<text x="95" y="${585 + index * 62}" font-family="Arial, sans-serif" font-size="${index === 0 ? 31 : 27}" font-weight="${index === 0 ? 700 : 400}">${escapeXml(line)}</text>`).join('')}
+    <rect x="72" y="1055" width="1356" height="380" rx="12" fill="#fffdf8" stroke="#172f28" stroke-width="3"/>
+    ${warningMarkup(variant, { x: 95, y: 1145, size: 27, lineHeight: 52 })}
+    <text x="750" y="1560" text-anchor="middle" font-family="Arial, sans-serif" font-size="26">${escapeXml(responsibility)}</text>
+  </svg>`
+}
+
 function sampleSvg(variant: SampleVariant) {
   if (variant === 'angled-photo') return emberLabel()
   if (variant === 'glare-photo') return harborLabel()
   if (variant === 'dark-label') return orchardLabel()
+  if (['production-disclosures', 'significant-solids', 'exemption-distinctive'].includes(variant)) return additionalConditionalLabel(variant)
+  if (['imported-clear', 'imported-origin-mismatch', 'conditional-disclosures', 'conditional-missing', 'blur-photo', 'partial-obstruction', 'missing-context', 'routing-override'].includes(variant)) return expandedRuleLabel(variant)
   return classicLabel(variant)
 }
 
@@ -248,7 +539,9 @@ export async function createSampleFile(variant: SampleVariant) {
       context.translate(canvas.width, canvas.height)
       context.rotate(Math.PI)
     }
+    if (variant === 'blur-photo') context.filter = 'blur(2.4px) contrast(0.88)'
     context.drawImage(image, 0, 0)
+    context.filter = 'none'
     if (variant === 'glare-photo') {
       const glare = context.createLinearGradient(250, 0, 950, 1300)
       glare.addColorStop(0, 'rgba(255,255,255,0)')
@@ -260,6 +553,14 @@ export async function createSampleFile(variant: SampleVariant) {
       context.fillRect(0, 0, canvas.width, canvas.height)
       context.fillStyle = 'rgba(236, 239, 230, 0.12)'
       context.fillRect(0, 0, canvas.width, canvas.height)
+    }
+    if (variant === 'partial-obstruction') {
+      context.save()
+      context.translate(1150, 505)
+      context.rotate(-0.18)
+      context.fillStyle = 'rgba(35, 48, 42, 0.94)'
+      context.fillRect(-250, -95, 540, 190)
+      context.restore()
     }
   }
 

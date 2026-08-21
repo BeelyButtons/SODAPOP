@@ -20,6 +20,36 @@ export const applicationSchema = z.object({
     .number()
     .positive('Container volume must be greater than zero.')
     .max(100_000, 'Container volume is outside the supported range.'),
+  applicationType: z.enum(['cola', 'exemption']).optional(),
+  distinctiveBottleRequested: z.boolean().optional(),
+  destinationState: z.string().trim().optional(),
+  fancifulName: z.string().trim().optional(),
+  applicantName: z.string().trim().optional(),
+  applicantAddress: z.string().trim().optional(),
+  permitName: z.string().trim().optional(),
+  permitAddress: z.string().trim().optional(),
+  formulaRequired: z.boolean().optional(),
+  formulaId: z.string().trim().optional(),
+  formulaClassType: z.string().trim().optional(),
+  formulaCompositionStatement: z.string().trim().optional(),
+  formulaLabelingInstructions: z.string().trim().optional(),
+  labelDimensions: z.string().trim().optional(),
+  labelSet: z.boolean().optional(),
+  bottleMarkings: z.string().trim().optional(),
+  bottleDesignEvidence: z.string().trim().optional(),
+  containsSignificantSolids: z.boolean().optional(),
+  containsNeutralSpirits: z.boolean().optional(),
+  requiresAgeStatement: z.boolean().optional(),
+  spiritsAgeOrMaturityClaim: z.boolean().optional(),
+  requiresWoodTreatmentDisclosure: z.boolean().optional(),
+  requiresStateOfDistillation: z.boolean().optional(),
+  containsYellow5: z.boolean().optional(),
+  containsCochinealOrCarmine: z.boolean().optional(),
+  sulfitesPpm: z.number().nonnegative().optional(),
+  containsAspartame: z.boolean().optional(),
+  importCountryOfOrigin: z.string().trim().optional(),
+  importBottlingDisposition: z.string().trim().optional(),
+  productionFacts: z.string().trim().optional(),
 })
 
 export type ApplicationData = z.infer<typeof applicationSchema>
@@ -32,6 +62,32 @@ export const INITIAL_APPLICATION: ApplicationData = {
   alcoholContent: '45% Alc./Vol. (90 Proof)',
   netContents: '750 mL',
   containerVolumeMl: 750,
+  applicationType: 'cola',
+  distinctiveBottleRequested: false,
+  applicantName: 'OLD TOM DISTILLERY',
+  applicantAddress: 'FRANKFORT, KENTUCKY',
+  permitName: 'OLD TOM DISTILLERY',
+  permitAddress: 'FRANKFORT, KENTUCKY',
+  formulaRequired: false,
+  formulaId: '',
+  formulaClassType: '',
+  formulaCompositionStatement: '',
+  formulaLabelingInstructions: '',
+  fancifulName: '',
+  labelDimensions: 'Complete single label face; 4 × 6 inches',
+  labelSet: true,
+  bottleMarkings: 'None documented',
+  containsSignificantSolids: false,
+  containsNeutralSpirits: false,
+  requiresAgeStatement: false,
+  spiritsAgeOrMaturityClaim: true,
+  requiresWoodTreatmentDisclosure: false,
+  requiresStateOfDistillation: false,
+  containsYellow5: false,
+  containsCochinealOrCarmine: false,
+  sulfitesPpm: 0,
+  containsAspartame: false,
+  productionFacts: 'Small batch production documented. Youngest applicable spirit aged 4 years.',
 }
 
 export type CheckStatus = 'pass' | 'mismatch' | 'needs_review'
@@ -60,11 +116,13 @@ export type HighlightRegion = {
 }
 
 export type ReviewCheck = {
-  id: 'brand' | 'classType' | 'alcohol' | 'netContents' | 'warningText' | 'warningFormat'
+  id: string
+  ruleId?: string
   label: string
   status: CheckStatus
   expected: string
   requirements?: string[]
+  requirementsLabel?: string
   observed: string
   explanation: string
   highlight?: HighlightRegion

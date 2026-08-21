@@ -35,7 +35,11 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: /Start \/ Restart label reviews/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Compliant example/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Upside-down photo/i })).toBeInTheDocument()
-    expect(screen.getByLabelText(/9 labels remaining/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Imported spirits — complete/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Incorrect automatic rule set/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Production disclosures — complete/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Intrastate exemption and bottle evidence/i })).toBeInTheDocument()
+    expect(screen.getByLabelText(/20 labels remaining/i)).toBeInTheDocument()
   })
 
   it('renders a stable full rule-set reference route', () => {
