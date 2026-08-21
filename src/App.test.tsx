@@ -37,4 +37,13 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: /Upside-down photo/i })).toBeInTheDocument()
     expect(screen.getByLabelText(/9 labels remaining/i)).toBeInTheDocument()
   })
+
+  it('renders a stable full rule-set reference route', () => {
+    window.history.replaceState({}, '', '/rules/distilled-spirits-domestic')
+    render(<App />)
+
+    expect(screen.getByRole('heading', { name: 'Distilled spirits — Domestic' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Base rules' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Conditional rules' })).toBeInTheDocument()
+  })
 })

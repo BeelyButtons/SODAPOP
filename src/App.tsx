@@ -5,6 +5,7 @@ import { ReviewResults } from './components/ReviewResults'
 import { ReviewPortal } from './components/ReviewPortal'
 import { CompletedReviews } from './components/CompletedReviews'
 import { UploadPanel } from './components/UploadPanel'
+import { RuleSetReference } from './components/RuleSetReference'
 import { SAMPLE_LABELS, createSampleFile } from './data/sampleLabels'
 import {
   INITIAL_APPLICATION,
@@ -15,8 +16,14 @@ import {
   type ReviewOutcome,
 } from './domain/reviewSchema'
 import { verifyLabel } from './domain/verifyLabel'
+import {
+  overrideRuleSet,
+  reviewContextFromApplication,
+  selectAutomaticRuleSet,
+} from './domain/ruleEngine'
+import { RULE_SET_SPECIFICATIONS } from './domain/ruleSpecification'
 import { recognizeLabel, warmOcrEngine, type OcrProgress } from './ocr/recognizeLabel'
-import { appUrl, useAppRoute, type AppRoute } from './routing'
+import { appUrl, ruleSetIdFromRoute, useAppRoute, type AppRoute } from './routing'
 import {
   appendReviewRecord,
   changeDecisionFromRoute,
@@ -47,12 +54,15 @@ function App() {
   const [progress, setProgress] = useState<OcrProgress | null>(null)
   const [result, setResult] = useState<ReviewOutcome | null>(null)
   const [loadingSample, setLoadingSample] = useState<string | null>(null)
+  const [reanalyzingRuleSet, setReanalyzingRuleSet] = useState(false)
   const [queueProgress, setQueueProgress] = useState<QueueProgress>(readQueueProgress)
   const processingQueueCase = useRef<string | null>(null)
   const completedScrollPosition = useRef(0)
   const changeDecisionRoute = changeDecisionFromRoute(route)
   const completedReviewId = completedIdFromRoute(route)
   const activeQueueId = queueIdFromRoute(route)
+  const ruleSetReferenceId = ruleSetIdFromRoute(route)
+  const ruleSetReference = RULE_SET_SPECIFICATIONS.find((ruleSet) => ruleSet.id === ruleSetReferenceId)
   const activeQueueSample = queueSample(activeQueueId)
   const completedRecord = reviewRecordById(queueProgress, completedReviewId)
   const completedQueueSample = queueSample(completedRecord?.sampleId ?? null)
@@ -77,6 +87,7 @@ function App() {
 
   useEffect(() => {
     if (route === '/results' && !result) navigate('/review', true)
+    if (ruleSetReferenceId && !ruleSetReference) navigate('/review', true)
     if (activeQueueId && !activeQueueSample) navigate('/review', true)
     if (completedReviewId && (!completedQueueSample || !completedRecord)) navigate('/review/completed', true)
     if (changeDecisionRoute && (
@@ -84,7 +95,9 @@ function App() {
       !amendmentRecord?.result ||
       !amendmentRecord.result.checks.some((check) => check.id === amendmentCheckId)
     )) navigate(amendmentRecord ? `/review/completed/${amendmentRecord.id}` : '/review/completed', true)
-    document.title = route === '/review'
+    document.title = ruleSetReference
+      ? `${ruleSetReference.label} rules · SODAPOP`
+      : route === '/review'
       ? 'Review portal · SODAPOP'
       : route === '/review/completed'
         ? 'Completed reviews · SODAPOP'
@@ -95,7 +108,7 @@ function App() {
         : completedReviewId
           ? 'Completed decision · SODAPOP'
         : 'Review results · SODAPOP'
-  }, [activeQueueId, activeQueueSample, amendmentCheckId, amendmentQueueSample, amendmentRecord, changeDecisionRoute, completedQueueSample, completedRecord, completedReviewId, navigate, result, route])
+  }, [activeQueueId, activeQueueSample, amendmentCheckId, amendmentQueueSample, amendmentRecord, changeDecisionRoute, completedQueueSample, completedRecord, completedReviewId, navigate, result, route, ruleSetReference, ruleSetReferenceId])
 
   useEffect(() => {
     const savedQueueSample = completedQueueSample ?? amendmentQueueSample
@@ -348,6 +361,36 @@ function App() {
     navigate(`/review/completed/${amendmentRecord.id}`)
   }
 
+  function reanalyzeWithRuleSet(ruleSetId: string) {
+    if (!result || reanalyzingRuleSet) return
+    const reviewApplication = result.application ?? application
+    const context = reviewContextFromApplication(reviewApplication)
+    const previousSelection = result.ruleSelection ?? selectAutomaticRuleSet(context)
+    setReanalyzingRuleSet(true)
+    window.setTimeout(() => {
+      const startedAt = performance.now()
+      const selection = overrideRuleSet(previousSelection, context, ruleSetId)
+      const nextResult = verifyLabel({
+        application: reviewApplication,
+        ocrText: result.ocrText,
+        ocrConfidence: result.ocrConfidence,
+        durationMs: result.durationMs,
+        ocrWords: result.ocrWords,
+        imageWidth: result.imageWidth,
+        imageHeight: result.imageHeight,
+        ocrAttempts: result.ocrAttempts,
+        ocrRotationDegrees: result.ocrRotationDegrees,
+        ruleSelection: selection,
+      })
+      nextResult.ruleSelection = {
+        ...selection,
+        reanalysisMs: performance.now() - startedAt,
+      }
+      setResult(nextResult)
+      setReanalyzingRuleSet(false)
+    }, 0)
+  }
+
   return (
     <div className="app-shell">
       <header className="site-header">
@@ -384,11 +427,13 @@ function App() {
               Results
             </a>
           )}
-          <span className="prototype-badge">Prototype · Distilled spirits</span>
+          <span className="prototype-badge">Prototype · Rule routing</span>
         </nav>
       </header>
 
       <main id="top">
+        {ruleSetReference && <RuleSetReference ruleSetId={ruleSetReference.id} />}
+
         {route === '/review' && (
           <ReviewPortal
             progress={queueProgress}
@@ -446,6 +491,7 @@ function App() {
                   initialDecisions={completedRecord.staffDecisions}
                   initialRotation={completedRecord.rotationDegrees}
                   recordedDecision={completedRecord.finalDecision}
+                  application={completedQueueSample.application}
                   onChangeDecision={isCurrentCompletedRecord ? (checkId) => changeCompletedDecision(completedRecord.id, checkId) : undefined}
                 />
               ) : <div className="progress-panel"><strong>Loading saved label artwork…</strong></div>
@@ -542,6 +588,8 @@ function App() {
             fileName={file.name}
             onFinalDecision={completeQueueCase}
             onPause={pauseQueue}
+            reanalyzingRuleSet={reanalyzingRuleSet}
+            onRuleSetOverride={reanalyzeWithRuleSet}
             pageContext={{
               eyebrow: 'Queued label review',
               title: activeQueueSample.name,
@@ -571,6 +619,7 @@ function App() {
                 onFinalDecision={completeQueueCase}
                 onPause={exitDecisionChange}
                 pauseLabel="Exit decision change"
+                application={amendmentQueueSample.application}
               />
             ) : <div className="progress-panel"><strong>Loading saved label artwork…</strong></div>}
           </>
@@ -587,7 +636,13 @@ function App() {
                 ← Back to application
               </button>
             </div>
-            <ReviewResults result={result} previewUrl={previewUrl} fileName={file.name} />
+            <ReviewResults
+              result={result}
+              previewUrl={previewUrl}
+              fileName={file.name}
+              reanalyzingRuleSet={reanalyzingRuleSet}
+              onRuleSetOverride={reanalyzeWithRuleSet}
+            />
           </>
         )}
 

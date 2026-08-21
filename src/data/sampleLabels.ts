@@ -19,6 +19,7 @@ export type SampleLabel = {
 }
 
 const EMBER_APPLICATION: ApplicationData = {
+  ...INITIAL_APPLICATION,
   brandName: 'EMBER & ASH',
   classType: 'STRAIGHT RYE WHISKEY',
   alcoholContent: '50% Alc./Vol. (100 Proof)',
@@ -27,6 +28,7 @@ const EMBER_APPLICATION: ApplicationData = {
 }
 
 const HARBOR_APPLICATION: ApplicationData = {
+  ...INITIAL_APPLICATION,
   brandName: 'HARBOR LIGHT',
   classType: 'AMERICAN DRY GIN',
   alcoholContent: '42% Alc./Vol. (84 Proof)',
@@ -35,6 +37,7 @@ const HARBOR_APPLICATION: ApplicationData = {
 }
 
 const ORCHARD_APPLICATION: ApplicationData = {
+  ...INITIAL_APPLICATION,
   brandName: 'NIGHT ORCHARD',
   classType: 'APPLE BRANDY',
   alcoholContent: '40% Alc./Vol. (80 Proof)',

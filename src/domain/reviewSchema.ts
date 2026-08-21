@@ -4,6 +4,8 @@ export const GOVERNMENT_WARNING =
   'GOVERNMENT WARNING: (1) According to the Surgeon General, women should not drink alcoholic beverages during pregnancy because of the risk of birth defects. (2) Consumption of alcoholic beverages impairs your ability to drive a car or operate machinery, and may cause health problems.'
 
 export const applicationSchema = z.object({
+  productType: z.enum(['distilled_spirits', 'wine', 'malt_beverage']),
+  source: z.enum(['domestic', 'imported']),
   brandName: z.string().trim().min(2, 'Enter the brand name.'),
   classType: z.string().trim().min(3, 'Enter the class or type.'),
   alcoholContent: z
@@ -23,6 +25,8 @@ export const applicationSchema = z.object({
 export type ApplicationData = z.infer<typeof applicationSchema>
 
 export const INITIAL_APPLICATION: ApplicationData = {
+  productType: 'distilled_spirits',
+  source: 'domestic',
   brandName: 'OLD TOM DISTILLERY',
   classType: 'Kentucky Straight Bourbon Whiskey',
   alcoholContent: '45% Alc./Vol. (90 Proof)',
@@ -74,6 +78,11 @@ export type ReviewOutcome = {
   durationMs: number
   ocrAttempts?: number
   ocrRotationDegrees?: number
+  application?: ApplicationData
+  ocrWords?: OcrWord[]
+  imageWidth?: number
+  imageHeight?: number
+  ruleSelection?: import('./ruleEngine').RuleSetSelection
 }
 
 export const imageFileSchema = z

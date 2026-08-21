@@ -18,6 +18,11 @@ import {
   parseVolume,
   similarity,
 } from './normalization'
+import {
+  reviewContextFromApplication,
+  selectAutomaticRuleSet,
+  type RuleSetSelection,
+} from './ruleEngine'
 
 type VerificationInput = {
   application: ApplicationData
@@ -29,6 +34,7 @@ type VerificationInput = {
   imageHeight?: number
   ocrAttempts?: number
   ocrRotationDegrees?: number
+  ruleSelection?: RuleSetSelection
 }
 
 function normalizedToken(value: string) {
@@ -382,7 +388,10 @@ export function verifyLabel(input: VerificationInput): ReviewOutcome {
     return highlight ? { ...check, highlight } : check
   }
 
-  const checks: ReviewCheck[] = [
+  const ruleSelection = input.ruleSelection ?? selectAutomaticRuleSet(
+    reviewContextFromApplication(input.application),
+  )
+  const fullChecks: ReviewCheck[] = [
     withDetectedHighlight(brandCheck),
     withDetectedHighlight(classTypeCheck),
     withDetectedHighlight(detectedAlcoholCheck),
@@ -395,6 +404,9 @@ export function verifyLabel(input: VerificationInput): ReviewOutcome {
       improperBoldBody,
     ),
   ]
+  const checks = ruleSelection.selectedRuleSetId === 'wine-under-7-ttb-routing'
+    ? fullChecks.filter((check) => check.id === 'warningText' || check.id === 'warningFormat')
+    : fullChecks
 
   const status: CheckStatus = checks.some((check) => check.status === 'mismatch')
     ? 'mismatch'
@@ -402,5 +414,5 @@ export function verifyLabel(input: VerificationInput): ReviewOutcome {
       ? 'needs_review'
       : 'pass'
 
-  return { ...input, status, checks }
+  return { ...input, ruleSelection, status, checks }
 }

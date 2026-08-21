@@ -22,8 +22,9 @@ SODAPOP — System for Optical Detection, Analysis & Packaging-Oversight Process
 - Angled-label deskewing and orientation-aware highlights: working
 - Conditional glare and alternate-orientation OCR retries: working
 - URL-aware SPA views for the queue, individual cases, new-label intake, and results: working
-- Automated verification: 59 tests, GitHub Pages production build, and lint checks passing
-- Post-rule-expansion specification: seven TTB review/routing rule sets, granular rule records, and an application-data source map are ready for project-owner review; routing and UI behavior are not yet implemented
+- Automated verification: routing, interface, OCR, decision-workflow, GitHub Pages production-build, and lint checks passing
+- Post-rule-expansion routing foundation: working, with seven TTB review/routing rule sets, tri-state applicability, automatic selection, transparent selection reasons, and reviewer overrides
+- Cached-evidence rule-set reanalysis: working without a second OCR pass; alternative rule sets are ranked only when the reviewer opens the rule control
 - Batch review: planned after the single-label workflow is validated
 - Live URL: [https://beelybuttons.github.io/SODAPOP/](https://beelybuttons.github.io/SODAPOP/)
 
@@ -49,6 +50,9 @@ SODAPOP — System for Optical Detection, Analysis & Packaging-Oversight Process
 18. Rotates any label preview in 90-degree steps while keeping OCR highlights aligned, without rerunning OCR for a display-only change.
 19. Zooms label artwork from 50% to 200% in 10% increments around the active evidence, then supports click-and-drag or touch panning while scaling and moving the image and OCR highlight layer together.
 20. Measures processing time against the five-second usability target.
+21. Selects a TTB rule set from the COLA application context: beverage type, domestic/imported source, and wine alcohol content.
+22. Shows the applied rule set and its selection reasons in the sticky review bar, with per-rule `Applies`, `Does not apply`, or `Missing context` status.
+23. Lets staff inspect a full rule reference in a separate browser tab, override a mistaken selection, and rerun deterministic analysis from cached OCR and image evidence.
 
 The application uses meaningful browser routes even though it remains a client-side SPA:
 
@@ -59,6 +63,7 @@ The application uses meaningful browser routes even though it remains a client-s
 - `/SODAPOP/review/completed/:decision-id/change/:check-id` — a confirmed per-card decision amendment
 - `/SODAPOP/review/new` — application values and independent label intake
 - `/SODAPOP/results` — automated evidence, staff determinations, and final decision
+- `/SODAPOP/rules/:rule-set-id` — a persistent, read-only reference for an individual rule set
 
 GitHub Pages receives a `404.html` copy of the SPA entry point so direct links and browser refreshes can return to the appropriate client-side route. Results are intentionally session-only; directly opening `/results` without an active review returns the user to `/review`.
 
@@ -76,7 +81,7 @@ The project owner defined all work through the current distilled-spirits experie
 
 Before changing the interface or verification behavior, the approved research catalog was converted into a formal specification in [`docs/post-rule-expansion-specification.md`](docs/post-rule-expansion-specification.md) and `src/domain/ruleSpecification.ts`. It defines one record per reviewer-facing rule, the application/formula/supporting facts needed to decide applicability, seven initial regulatory rule sets, explicit missing-context behavior, and integrity tests. Wine below 7 percent alcohol by volume is represented as a TTB jurisdiction-routing branch without implementing FDA rules.
 
-The project owner's proposed reviewer safeguard is also part of the specification: the selected rule set will be visible in the sticky decision bar, explain why it was selected, provide a separate full-reference view, and permit a deliberate reviewer override followed by reanalysis. Alternative ranking and detailed rule views will be loaded only when requested, while an override will reuse cached OCR and image evidence. This keeps rule transparency and correction available without burdening the initial five-second analysis target.
+The project owner's reviewer safeguard is now implemented: the selected rule set is visible in the sticky decision bar, explains why it was selected, provides a separate full-reference view, and permits a deliberate reviewer override followed by reanalysis. The project owner specifically required protection against an incorrectly inferred branch without slowing routine work. SODAPOP therefore ranks alternatives only when the reviewer opens the control, clearly warns about conflicts with the application facts, clears stale card decisions when the rule set changes, and reuses cached OCR text, word coordinates, and image evidence. This keeps transparency and correction available without adding another expensive OCR pass or burdening the initial five-second analysis target.
 
 ### Review queue and accessibility improvements
 
@@ -146,6 +151,8 @@ The real process uses COLAs Online or [TTB Form 5100.31](https://www.ttb.gov/med
 - Net contents
 - Container volume, used to select warning-size requirements
 - Label artwork
+- Beverage type (distilled spirits, wine, or malt beverage)
+- Domestic or imported source
 
 Class/type is included because it is part of the exercise’s expected review, even though it is not necessarily entered as an independent field on every current COLA application. A future integration should map from the authoritative COLAs Online data contract rather than this prototype form.
 
@@ -222,7 +229,7 @@ public/ocr/          Same-origin OCR worker, runtime, and language assets
 
 ## Assumptions and limitations
 
-- The initial scope is distilled spirits; wine and malt-beverage rules are not implemented.
+- Automatic rule-set routing now covers distilled spirits, wine, and malt beverages. The current reviewer-card implementation remains the pre-expansion distilled-spirits set except for the explicit under-7%-wine TTB warning/routing branch; the full beverage-specific card expansion is the next phase.
 - This prototype uses manual application entry. Batch CSV input comes next.
 - OCR accuracy still depends on image quality. Included glare, perspective, upside-down, varied-layout, and reverse-type fixtures expose these limitations for staff evaluation and regression testing.
 - The five-second result is a development-machine measurement on synthetic fixtures, not a service-level guarantee.
@@ -236,9 +243,8 @@ The current implementation has no application runtime fee: all processing is loc
 
 ## Next increment
 
-1. Review and approve the post-rule-expansion rule and application-data specification.
-2. Implement tri-state applicability and automatic rule-set routing without changing the current staff decision rule.
-3. Expand the distilled-spirits review cards and regression tests from the approved specification.
-4. Add the visible rule-set explanation, full-reference route, manual override, and cached-evidence reanalysis.
-5. Validate the five-second target on clean and difficult images before adding wine and malt-beverage engines.
-6. Add wine and malt-beverage rules in reviewed increments, then return to batch intake and export work.
+1. Review the implemented routing, visible rule-set explanation, full-reference route, manual override, and cached-evidence reanalysis in the single-label workflow.
+2. Expand the actual domestic and imported distilled-spirits review cards and regression tests from the approved specification.
+3. Validate the five-second target on clean and difficult images with the expanded distilled-spirits cards.
+4. Add wine and malt-beverage cards in reviewed increments, preserving automatic routing, tri-state applicability, cached evidence, and staff Pass/Fail for every applicable item.
+5. Return to batch intake and export only after the single-label rule-expanded workflow is accepted.

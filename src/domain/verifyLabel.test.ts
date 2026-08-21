@@ -84,6 +84,22 @@ describe('verifyLabel', () => {
     expect(outcome.status).toBe('needs_review')
   })
 
+  it('uses only TTB warning checks for wine below seven percent', () => {
+    const outcome = verifyLabel({
+      application: {
+        ...INITIAL_APPLICATION,
+        productType: 'wine',
+        alcoholContent: '6.5% Alc. by Vol.',
+      },
+      ocrText: validOcrText,
+      ocrConfidence: 95,
+      durationMs: 1_250,
+    })
+
+    expect(outcome.ruleSelection?.selectedRuleSetId).toBe('wine-under-7-ttb-routing')
+    expect(outcome.checks.map((check) => check.id)).toEqual(['warningText', 'warningFormat'])
+  })
+
   it('treats harmless brand capitalization as a match', () => {
     const outcome = review(validOcrText.replace('OLD TOM DISTILLERY', 'Old Tom Distillery'))
 

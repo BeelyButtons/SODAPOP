@@ -12,6 +12,31 @@ export function ApplicationForm({ application, errors, onChange }: Props) {
       <legend>Application details</legend>
       <p className="panel-description">Values supplied by the COLA application.</p>
 
+      <div className="field-row">
+        <label>
+          <span>Product type</span>
+          <select
+            value={application.productType}
+            onChange={(event) => onChange('productType', event.target.value as ApplicationData['productType'])}
+          >
+            <option value="distilled_spirits">Distilled spirits</option>
+            <option value="wine">Wine</option>
+            <option value="malt_beverage">Malt beverage</option>
+          </select>
+        </label>
+
+        <label>
+          <span>Source</span>
+          <select
+            value={application.source}
+            onChange={(event) => onChange('source', event.target.value as ApplicationData['source'])}
+          >
+            <option value="domestic">Domestic</option>
+            <option value="imported">Imported</option>
+          </select>
+        </label>
+      </div>
+
       <label>
         <span>Brand name</span>
         <input

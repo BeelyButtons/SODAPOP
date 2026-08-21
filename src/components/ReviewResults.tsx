@@ -1,5 +1,7 @@
 import { useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
-import type { CheckStatus, ReviewCheck, ReviewOutcome } from '../domain/reviewSchema'
+import { RuleSetControl } from './RuleSetControl'
+import { reviewContextFromApplication, selectAutomaticRuleSet } from '../domain/ruleEngine'
+import type { ApplicationData, CheckStatus, ReviewCheck, ReviewOutcome } from '../domain/reviewSchema'
 import type { QueueDecision, SavedRotation, StaffDecisions } from '../reviewQueue'
 
 const statusLabels: Record<CheckStatus, string> = {
@@ -47,6 +49,9 @@ type Props = {
     title: string
     description?: string
   }
+  application?: ApplicationData
+  reanalyzingRuleSet?: boolean
+  onRuleSetOverride?: (ruleSetId: string) => void
 }
 
 function CheckCard({
@@ -181,6 +186,9 @@ export function ReviewResults({
   pauseLabel = 'Pause review',
   onChangeDecision,
   pageContext,
+  application,
+  reanalyzingRuleSet = false,
+  onRuleSetOverride,
 }: Props) {
   const [previewedCheck, setPreviewedCheck] = useState<ReviewCheck['id'] | null>(null)
   const [selectedCheck, setSelectedCheck] = useState<ReviewCheck['id'] | null>(null)
@@ -198,6 +206,9 @@ export function ReviewResults({
   const [isPanning, setIsPanning] = useState(false)
   const dragSession = useRef<{ pointerId: number, startX: number, startY: number, panX: number, panY: number } | null>(null)
   const [naturalSize, setNaturalSize] = useState({ width: 1, height: 1 })
+  const reviewApplication = result.application ?? application
+  const reviewContext = reviewApplication ? reviewContextFromApplication(reviewApplication) : {}
+  const ruleSelection = result.ruleSelection ?? selectAutomaticRuleSet(reviewContext)
 
   const sortedChecks = useMemo(
     () => result.checks.map((check, index) => ({ check, index }))
@@ -258,6 +269,17 @@ export function ReviewResults({
     setStaffDecisions(next)
     setSubmittedDecision(null)
     if (result.checks.every((check) => next[check.id] === 'pass')) setPendingPass(true)
+  }
+
+  function changeRuleSet(ruleSetId: string) {
+    setStaffDecisions({})
+    setPendingFail(null)
+    setPendingPass(false)
+    setPendingAmendmentFinal(null)
+    setSubmittedDecision(null)
+    setSelectedCheck(null)
+    setPreviewedCheck(null)
+    onRuleSetOverride?.(ruleSetId)
   }
 
   function submit(decision: QueueDecision, decisions: StaffDecisions) {
@@ -343,6 +365,13 @@ export function ReviewResults({
           <h2 id="results-title">{readOnly ? 'Completed label decision' : amendmentCheckId ? 'Update this label compliance determination' : 'Make your label compliance determination'}</h2>
           <strong>{readOnly ? `Final decision: ${recordedDecision === 'pass' ? 'Pass' : 'Fail'}` : `${decidedCount} of ${result.checks.length} decided${amendmentCheckId ? ' · previous answers preserved' : ''}`}</strong>
         </div>
+        <RuleSetControl
+          selection={ruleSelection}
+          context={reviewContext}
+          readOnly={readOnly}
+          reanalyzing={reanalyzingRuleSet}
+          onOverride={onRuleSetOverride ? changeRuleSet : undefined}
+        />
         <div className="compact-metrics">
           <span><strong>{Math.round(result.ocrConfidence)}%</strong> OCR confidence</span>
           <span className={result.durationMs <= 5000 ? 'metric-good' : 'metric-slow'}>
