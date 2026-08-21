@@ -50,4 +50,16 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: 'Base rules' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Conditional rules' })).toBeInTheDocument()
   })
+
+  it('keeps completed reviews available in primary navigation', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    const completedLink = screen.getByRole('link', { name: /Completed reviews/i })
+    await user.click(completedLink)
+
+    expect(window.location.pathname).toBe('/review/completed')
+    expect(completedLink).toHaveClass('active')
+    expect(screen.getByRole('heading', { name: /Completed label review decisions/i })).toBeInTheDocument()
+  })
 })

@@ -412,6 +412,13 @@ function App() {
             Review queue
           </a>
           <a
+            className={route.startsWith('/review/completed') ? 'active' : ''}
+            href={appUrl('/review/completed')}
+            onClick={(event) => routeLink(event, '/review/completed')}
+          >
+            Completed reviews
+          </a>
+          <a
             className={route === '/review/new' ? 'active' : ''}
             href={appUrl('/review/new')}
             onClick={(event) => routeLink(event, '/review/new')}

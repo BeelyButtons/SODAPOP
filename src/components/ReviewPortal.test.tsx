@@ -15,11 +15,26 @@ const progress: QueueProgress = {
 }
 
 describe('ReviewPortal', () => {
-  it('renumbers only the remaining reviews from one', () => {
+  it('shows only remaining reviews in a copyable table', () => {
     render(<ReviewPortal progress={progress} onStart={vi.fn()} onSelect={vi.fn()} onCompleted={vi.fn()} onReset={vi.fn()} />)
 
-    const firstRemaining = screen.getByRole('button', { name: /ABV mismatch/i })
-    expect(firstRemaining).toHaveTextContent(/^1/)
+    expect(screen.getByRole('table', { name: /Labels waiting for review/i })).toBeInTheDocument()
+    expect(screen.getByRole('row', { name: /ABV mismatch/i })).toBeInTheDocument()
+    expect(screen.queryByRole('row', { name: /Compliant example/i })).not.toBeInTheDocument()
+  })
+
+  it('searches and filters the remaining queue', async () => {
+    const user = userEvent.setup()
+    render(<ReviewPortal progress={progress} onStart={vi.fn()} onSelect={vi.fn()} onCompleted={vi.fn()} onReset={vi.fn()} />)
+
+    await user.type(screen.getByRole('searchbox', { name: /Search labels to review/i }), 'origin conflict')
+    expect(screen.getByRole('row', { name: /Imported origin conflict/i })).toBeInTheDocument()
+    expect(screen.queryByRole('row', { name: /ABV mismatch/i })).not.toBeInTheDocument()
+
+    await user.clear(screen.getByRole('searchbox', { name: /Search labels to review/i }))
+    await user.selectOptions(screen.getByRole('combobox', { name: /Source/i }), 'imported')
+    expect(screen.getByRole('row', { name: /Imported spirits — complete/i })).toBeInTheDocument()
+    expect(screen.queryByRole('row', { name: /ABV mismatch/i })).not.toBeInTheDocument()
   })
 
   it('confirms before clearing saved review history', async () => {

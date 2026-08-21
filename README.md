@@ -7,10 +7,10 @@ SODAPOP — System for Optical Detection, Analysis & Packaging-Oversight Process
 ## Current status
 
 - Single-label review: working
-- Resumable demonstration review queue: working
+- Resumable, searchable demonstration review table: working
 - Quick-fail confirmation and automatic move to the next label: working
 - Remaining-only queue with locked completed-decision history: working
-- Searchable, filterable, date-sortable completed-decision history: working
+- Searchable, filterable, date-sortable completed-decision table: working
 - Per-card decision changes with preserved answers and immutable revisions: working
 - Sticky reviewer controls with OCR confidence and elapsed time: working
 - Saved 90-degree label rotation without an OCR rerun: working
@@ -25,6 +25,7 @@ SODAPOP — System for Optical Detection, Analysis & Packaging-Oversight Process
 - Automated verification: routing, interface, OCR, decision-workflow, GitHub Pages production-build, and lint checks passing
 - Post-rule-expansion routing foundation: working, with seven TTB review/routing rule sets, tri-state applicability, automatic selection, transparent selection reasons, and reviewer overrides
 - Cached-evidence rule-set reanalysis: working without a second OCR pass; alternative rule sets are ranked only when the reviewer opens the rule control
+- Centered rule-set window: working with a pinned close control, outside-click and Escape dismissal, applicable-first rule details, collapsed non-applicable rules, focus restoration, and a compact alternative selector
 - Expanded distilled-spirits review: working for domestic/imported base requirements and conditional formula, exemption, bottle, composition, age, production, color, sulfite, and aspartame branches
 - Distilled-spirits regression queue: 20 cases spanning clear matches, explicit conflicts, missing context, incorrect routing, formula disclosures, glare, blur, low contrast, perspective, rotation, and partial obstruction
 - Batch review: planned after the single-label workflow is validated
@@ -32,7 +33,7 @@ SODAPOP — System for Optical Detection, Analysis & Packaging-Oversight Process
 
 ## What it does
 
-1. Presents unfinished demonstration labels in a staff review queue with a remaining count.
+1. Presents unfinished demonstration labels in a searchable, filterable staff table with product, source, automatically selected rule set, status, and a remaining count.
 2. Starts with the first unfinished label, supports pausing, and resumes from browser-local progress.
 3. Also accepts selected application values and a JPEG, PNG, or WebP label image for an independent review.
 4. Preprocesses the image and runs Tesseract LSTM OCR entirely in the browser.
@@ -46,14 +47,14 @@ SODAPOP — System for Optical Detection, Analysis & Packaging-Oversight Process
 12. Allows a reviewer to confirm a failure immediately after the first failed item instead of answering irrelevant remaining questions.
 13. Confirms a passing decision after every item is marked `Pass`, without a separate final-decision section.
 14. Moves to the next queued label after the final decision and returns to an empty queue when work is complete.
-15. Stores completed decisions in a searchable history that can be filtered by Pass or Fail and sorted by decision time.
+15. Stores completed decisions in a searchable table that can be filtered by outcome, product, domestic/imported source, or applied rule set and sorted by decision time.
 16. Gives every submitted decision a unique ID and preserves earlier revisions instead of overwriting them.
 17. Lets staff change an individual card decision while retaining prior answers and requiring a newly submitted final determination.
 18. Rotates any label preview in 90-degree steps while keeping OCR highlights aligned, without rerunning OCR for a display-only change.
 19. Zooms label artwork from 50% to 200% in 10% increments around the active evidence, then supports click-and-drag or touch panning while scaling and moving the image and OCR highlight layer together.
 20. Measures processing time against the five-second usability target.
 21. Selects a TTB rule set from the COLA application context: beverage type, domestic/imported source, and wine alcohol content.
-22. Shows the applied rule set and its selection reasons in the sticky review bar, with per-rule `Applies`, `Does not apply`, or `Missing context` status.
+22. Shows the applied rule set and its selection reasons in the sticky review bar; the centered rule window prioritizes applicable and missing-context rules while keeping non-applicable rules available behind an intentional disclosure.
 23. Lets staff inspect a full rule reference in a separate browser tab, override a mistaken selection, and rerun deterministic analysis from cached OCR and image evidence.
 24. Produces a staff Pass/Fail card for every applicable distilled-spirits rule instead of limiting review to the original six comparisons.
 25. Recommends Pass or Mismatch when packet and readable artwork evidence support that result; it uses Human review only when context or visible evidence is genuinely unresolved.
@@ -75,7 +76,7 @@ The included synthetic cases demonstrate a matching label, incorrect ABV, incorr
 
 ## Product direction and iterative improvement
 
-The workflow is being improved through repeated hands-on review by the project owner in collaboration with Codex. The project owner has driven the practical improvements: simplifying the opening experience, moving privacy information out of the way, making the label easier to inspect, identifying misleading sample-label behavior, requesting status-aware highlights, broadening the test-label designs, requiring an explicit staff decision instead of treating automation as approval, and replacing destructive re-review with a reviewer-friendly correction and audit-history workflow.
+The workflow is being improved through repeated hands-on review by the project owner in collaboration with Codex. The project owner has driven the practical improvements: simplifying the opening experience, moving privacy information out of the way, making the label easier to inspect, identifying misleading sample-label behavior, requesting status-aware highlights, broadening the test-label designs, requiring an explicit staff decision instead of treating automation as approval, replacing destructive re-review with a reviewer-friendly correction and audit-history workflow, and turning both work queues into searchable tables designed for fast scanning and copy/paste work.
 
 That iterative review materially changed the product from a basic OCR comparison demo into a staff-centered decision-support workflow. The project owner's latest review introduced the portal, persistent queue, sequential review experience, accessible evidence hierarchy, and quick-fail path. Each improvement is evaluated against a simple principle: automation should help staff locate and understand evidence, while staff retain responsibility for the regulatory determination.
 
@@ -85,15 +86,16 @@ The project owner defined all work through the current distilled-spirits experie
 
 Before changing the interface or verification behavior, the approved research catalog was converted into a formal specification in [`docs/post-rule-expansion-specification.md`](docs/post-rule-expansion-specification.md) and `src/domain/ruleSpecification.ts`. It defines one record per reviewer-facing rule, the application/formula/supporting facts needed to decide applicability, seven initial regulatory rule sets, explicit missing-context behavior, and integrity tests. Wine below 7 percent alcohol by volume is represented as a TTB jurisdiction-routing branch without implementing FDA rules.
 
-The project owner's reviewer safeguard is now implemented: the selected rule set is visible in the sticky decision bar, explains why it was selected, provides a separate full-reference view, and permits a deliberate reviewer override followed by reanalysis. The project owner specifically required protection against an incorrectly inferred branch without slowing routine work. SODAPOP therefore ranks alternatives only when the reviewer opens the control, clearly warns about conflicts with the application facts, clears stale card decisions when the rule set changes, and reuses cached OCR text, word coordinates, and image evidence. This keeps transparency and correction available without adding another expensive OCR pass or burdening the initial five-second analysis target.
+The project owner's reviewer safeguard is now implemented: the selected rule set is visible in the sticky decision bar, explains why it was selected, provides a separate full-reference view, and permits a deliberate reviewer override followed by reanalysis. The project owner specifically required protection against an incorrectly inferred branch without slowing routine work. SODAPOP therefore ranks alternatives only when the reviewer opens the control, clearly warns about conflicts with the application facts, clears stale card decisions when the rule set changes, and reuses cached OCR text, word coordinates, and image evidence. A later owner review exposed that the original window could be constrained by the sticky command bar and difficult to dismiss. The rule window now opens in a true page-level overlay, stays centered, pins its heading and close control while content scrolls, closes by X, Escape, or outside click, restores focus, shows applicable rules first, and keeps non-applicable rules collapsed. This preserves transparency without adding another expensive OCR pass or burdening the initial five-second analysis target.
 
 The project owner next required actual domestic and imported distilled-spirits cards and a regression queue that resembles real review conditions instead of repeating clean, nearly identical artwork. Combining regulatory branches with image defects exposed an unnecessary retry loop: an obstructed label had already yielded four of five core evidence groups, but OCR kept rescanning for the covered field and took 12.9 seconds. The quality gate now stops that high-confidence partial pass, surfaces the covered field for staff review, and completed the same case in 3.8 seconds during local validation.
 
 ### Review queue and accessibility improvements
 
-- Every unfinished synthetic case is visible in `Labels to Review` with its purpose.
+- Every unfinished synthetic case is visible in a semantic table with its purpose, product, source, automatically selected rule set, status, and direct Review action.
+- The remaining table can be searched and filtered by product, domestic/imported source, or rule set without running OCR.
 - Completed cases leave `Labels to Review`; the portal shows only unfinished work and a single Remaining count.
-- Remaining work is renumbered from 1 each time, and the confirmed queue-reset control sits beside the Remaining count it affects.
+- The confirmed queue-reset control sits beside the Remaining count it affects.
 - `Start / Restart label reviews` opens the first unfinished case; `Pause review` returns to the queue without discarding completed decisions.
 - Each case has a meaningful browser URL, and the original independent upload form remains available under `New label`.
 - Queue progress is stored only in the current browser and can be reset from the portal.
@@ -105,7 +107,8 @@ The project owner next required actual domestic and imported distilled-spirits c
 - A sticky command bar keeps staff progress, OCR confidence, elapsed time, and Pause visible while the cards scroll.
 - The sticky compliance command bar appears before the queued-label title and description, putting the reviewer’s task and progress first without changing its scrolling behavior.
 - Compact cards bold only the checked-item name. Government-warning formatting uses a labeled, responsive requirements list instead of a dense semicolon-separated sentence.
-- Completed decisions are searchable by keyword or decision ID, filterable by outcome, sortable by date, and stamped with the local decision date and time.
+- Completed decisions use the same copy-friendly table pattern and are searchable by keyword or decision ID, filterable by outcome, product, source, or applied rule set, sortable by date, and stamped with the local decision date and time.
+- `Completed reviews` is permanently available in primary navigation and remains visibly active on completed-list, decision-detail, and amendment routes.
 - Completed cards are locked against accidental edits. `Change decision` appears only when staff actually recorded Pass or Fail; cards skipped after Quick Fail have no decision to change. A confirmed change preserves earlier answers and makes unanswered cards available only when they are needed to reach a new final determination.
 - Every correction creates a uniquely addressed revision. Earlier decisions remain available in the on-screen history instead of being overwritten.
 - Label artwork uses one compact control row for orientation and zoom. It can be rotated clockwise or counterclockwise and saved at 90-degree intervals, or zoomed from 50% to 200% in 10% steps around active evidence. Above 100%, staff can click and drag (or drag by touch) to inspect any part of the artwork without persistent helper text consuming preview space. The image and highlight layer transform and move together, avoiding an unnecessary OCR rerun, keeping hover evidence aligned and visible, and protecting the five-second budget.

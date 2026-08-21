@@ -48,8 +48,8 @@ describe('CompletedReviews', () => {
     const user = userEvent.setup()
     render(<CompletedReviews progress={progress} onBack={vi.fn()} onOpen={vi.fn()} />)
 
-    expect(screen.getAllByRole('listitem')[0]).toHaveTextContent('ABV mismatch')
+    expect(screen.getAllByRole('row')[1]).toHaveTextContent('ABV mismatch')
     await user.selectOptions(screen.getByRole('combobox', { name: /Decision date/i }), 'oldest')
-    expect(screen.getAllByRole('listitem')[0]).toHaveTextContent('Compliant example')
+    expect(screen.getAllByRole('row')[1]).toHaveTextContent('Compliant example')
   })
 })
