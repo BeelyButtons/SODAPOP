@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { RuleSetControl } from './RuleSetControl'
 import { reviewContextFromApplication, selectAutomaticRuleSet } from '../domain/ruleEngine'
-import { buildReviewSections, type ReviewSection } from '../domain/reviewSections'
+import { buildReviewSections, presentedStatusForCheck, type ReviewSection } from '../domain/reviewSections'
 import type { ApplicationData, CheckStatus, ReviewCheck, ReviewOutcome } from '../domain/reviewSchema'
 import type { QueueDecision, SavedRotation, StaffDecisions } from '../reviewQueue'
 
@@ -181,6 +181,7 @@ function CheckCard({
 const sectionStatusLabels: Record<ReviewSection['status'], string> = {
   mismatch: 'Potential problem',
   needs_review: 'Needs staff review',
+  unverified: 'Not automatically verified',
   pass: 'Passed',
   not_applicable: 'Not applicable',
 }
@@ -190,6 +191,7 @@ function sectionSummary(section: ReviewSection) {
   const parts = []
   if (section.counts.mismatch) parts.push(`${section.counts.mismatch} potential ${section.counts.mismatch === 1 ? 'problem' : 'problems'}`)
   if (section.counts.needs_review) parts.push(`${section.counts.needs_review} ${section.counts.needs_review === 1 ? 'item needs' : 'items need'} staff judgment`)
+  if (section.counts.unverified) parts.push(`${section.counts.unverified} ${section.counts.unverified === 1 ? 'requirement was' : 'requirements were'} not automatically verified`)
   if (section.counts.pass) parts.push(`${section.counts.pass} ${section.counts.pass === 1 ? 'check passed' : 'checks passed'}`)
   return parts.join(' · ')
 }
@@ -218,14 +220,14 @@ function SimplifiedSection({
   const failed = section.checks.some((check) => decisions[check.id] === 'fail')
   const passed = section.checks.length > 0 && section.checks.every((check) => decisions[check.id] === 'pass')
   const sectionDecision = failed ? 'fail' : passed ? 'pass' : undefined
-  const firstAttentionCheck = section.checks.find((check) => check.status !== 'pass') ?? section.checks[0]
+  const firstAttentionCheck = section.checks.find((check) => presentedStatusForCheck(check) !== 'pass') ?? section.checks[0]
 
   return (
     <article className={`review-section-card review-section-${section.status}`} data-review-section-id={section.id}>
       <div className="review-section-heading">
         <div>
           <span className={`section-status-mark section-status-${section.status}`} aria-hidden="true">
-            {section.status === 'mismatch' ? '!' : section.status === 'needs_review' ? '?' : section.status === 'pass' ? '✓' : '—'}
+            {section.status === 'mismatch' ? '!' : section.status === 'needs_review' || section.status === 'unverified' ? '?' : section.status === 'pass' ? '✓' : '—'}
           </span>
           <div>
             <h3>{section.title}</h3>
@@ -237,12 +239,13 @@ function SimplifiedSection({
       <p className="review-section-summary">{sectionSummary(section)}</p>
 
       {section.checks.length > 0 && (
-        <details className="review-section-details" open={section.status === 'mismatch' || section.status === 'needs_review'}>
+        <details className="review-section-details" open={section.status === 'mismatch' || section.status === 'needs_review' || section.status === 'unverified'}>
           <summary>View {section.checks.length} underlying {section.checks.length === 1 ? 'requirement' : 'requirements'}</summary>
           <div className="review-section-checks">
-            {section.checks.map((check) => (
-              <button
-                className={`section-check-row section-check-${check.status}${activeCheckId === check.id ? ' active' : ''}`}
+            {section.checks.map((check) => {
+              const presentedStatus = presentedStatusForCheck(check)
+              return <button
+                className={`section-check-row section-check-${presentedStatus}${activeCheckId === check.id ? ' active' : ''}`}
                 key={check.id}
                 type="button"
                 onClick={() => onSelect(check.id)}
@@ -251,11 +254,11 @@ function SimplifiedSection({
                 onMouseEnter={() => onPreview(check.id)}
                 onMouseLeave={() => onPreview(null)}
               >
-                <span>{check.status === 'mismatch' ? '!' : check.status === 'needs_review' ? '?' : '✓'}</span>
+                <span>{presentedStatus === 'mismatch' ? '!' : presentedStatus === 'needs_review' || presentedStatus === 'unverified' ? '?' : '✓'}</span>
                 <span><strong>{check.label}</strong><small>{check.explanation}</small></span>
-                <span>{statusLabels[check.status]}</span>
+                <span>{presentedStatus === 'unverified' ? 'Not verified' : statusLabels[presentedStatus]}</span>
               </button>
-            ))}
+            })}
           </div>
         </details>
       )}
@@ -351,6 +354,8 @@ export function ReviewResults({
   const highlight = activeCheck?.highlight
   const highlightStatus = activeCheck?.status
   const decidedCount = result.checks.filter((check) => staffDecisions[check.id]).length
+  const applicableSections = reviewSections.filter((section) => section.checks.length > 0)
+  const decidedSectionCount = applicableSections.filter((section) => section.checks.every((check) => staffDecisions[check.id])).length
   const remainingGreenChecks = result.checks.filter((check) => check.status === 'pass' && !staffDecisions[check.id])
   const allCardsViewed = result.checks.length > 0 && result.checks.every((check) => viewedCheckIds.has(check.id))
   const amendmentFinalDecision: QueueDecision | null = result.checks.some((check) => staffDecisions[check.id] === 'fail')
@@ -569,7 +574,11 @@ export function ReviewResults({
       <div className="review-command-bar" ref={commandBarRef}>
         <div>
           <h2 id="results-title">{readOnly ? 'Completed label decision' : amendmentCheckId ? 'Update this label compliance determination' : 'Make your label compliance determination'}</h2>
-          <strong>{readOnly ? `Final decision: ${recordedDecision === 'pass' ? 'Pass' : 'Fail'}` : `${decidedCount} of ${result.checks.length} decided${amendmentCheckId ? ' · previous answers preserved' : ''}`}</strong>
+          <strong>{readOnly
+            ? `Final decision: ${recordedDecision === 'pass' ? 'Pass' : 'Fail'}`
+            : effectiveResultsView === 'simplified'
+              ? `${decidedSectionCount} of ${applicableSections.length} sections decided`
+              : `${decidedCount} of ${result.checks.length} decided${amendmentCheckId ? ' · previous answers preserved' : ''}`}</strong>
         </div>
         <RuleSetControl
           selection={ruleSelection}

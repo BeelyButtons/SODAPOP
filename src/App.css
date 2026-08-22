@@ -1179,6 +1179,7 @@ footer {
 
 .review-section-card.review-section-mismatch { border-left-color: #a9473e; }
 .review-section-card.review-section-needs_review { border-left-color: #b37b1e; }
+.review-section-card.review-section-unverified { border-left-color: #75858f; }
 .review-section-card.review-section-pass { border-left-color: #3b7a50; }
 .review-section-card.review-section-not_applicable { background: #f7f8f6; color: #68706b; }
 
@@ -1223,6 +1224,7 @@ footer {
 
 .section-status-mismatch { background: #f7dfdc; color: #842f29; }
 .section-status-needs_review { background: #f8ebc9; color: #795313; }
+.section-status-unverified { background: #e4ebef; color: #435965; }
 .section-status-pass { background: #def0e3; color: #205f36; }
 .section-status-not_applicable { background: #e7ebe8; color: #616963; }
 

@@ -9,7 +9,8 @@ export type ReviewSectionId =
   | 'formula_disclosures'
   | 'other_claims'
 
-export type ReviewSectionStatus = CheckStatus | 'not_applicable'
+export type PresentedCheckStatus = CheckStatus | 'unverified'
+export type ReviewSectionStatus = PresentedCheckStatus | 'not_applicable'
 
 export type ReviewSection = {
   id: ReviewSectionId
@@ -17,7 +18,7 @@ export type ReviewSection = {
   description: string
   status: ReviewSectionStatus
   checks: ReviewCheck[]
-  counts: Record<CheckStatus, number>
+  counts: Record<PresentedCheckStatus, number>
 }
 
 const SECTION_DEFINITIONS: ReadonlyArray<Pick<ReviewSection, 'id' | 'title' | 'description'>> = [
@@ -115,6 +116,33 @@ function includesAny(id: string, terms: readonly string[]) {
   return terms.some((term) => id.includes(term))
 }
 
+const recognitionUncertaintyPatterns = [
+  /\bocr\b.*\b(?:could not|did not|cannot|confidence|limited|reliably|resolve)/i,
+  /\bnot confidently detected\b/i,
+  /\bnot reliably (?:located|inventoried|confirmed|resolved)\b/i,
+  /\bheading was not confidently detected\b/i,
+]
+
+const absentObservationPatterns = [
+  /^not found$/i,
+  /\brequired statement not found\b/i,
+  /\bnot reliably located\b/i,
+  /\bstatement not found\b/i,
+  /\bstatement was not fully matched\b/i,
+  /\bdeclaration not found\b/i,
+]
+
+export function isRecognitionOnlyFinding(check: ReviewCheck) {
+  if (check.status === 'pass') return false
+  const narrative = `${check.observed} ${check.explanation}`
+  return recognitionUncertaintyPatterns.some((pattern) => pattern.test(narrative))
+    || absentObservationPatterns.some((pattern) => pattern.test(check.observed.trim()))
+}
+
+export function presentedStatusForCheck(check: ReviewCheck): PresentedCheckStatus {
+  return isRecognitionOnlyFinding(check) ? 'unverified' : check.status
+}
+
 export function sectionIdForCheck(check: ReviewCheck): ReviewSectionId {
   const id = `${check.ruleId ?? ''} ${check.id}`.toLowerCase()
   if (includesAny(id, warningTerms)) return 'government_warning'
@@ -128,8 +156,10 @@ export function sectionIdForCheck(check: ReviewCheck): ReviewSectionId {
 
 function sectionStatus(checks: ReviewCheck[]): ReviewSectionStatus {
   if (!checks.length) return 'not_applicable'
-  if (checks.some((check) => check.status === 'mismatch')) return 'mismatch'
-  if (checks.some((check) => check.status === 'needs_review')) return 'needs_review'
+  const statuses = checks.map(presentedStatusForCheck)
+  if (statuses.includes('mismatch')) return 'mismatch'
+  if (statuses.includes('needs_review')) return 'needs_review'
+  if (statuses.includes('unverified')) return 'unverified'
   return 'pass'
 }
 
@@ -141,11 +171,11 @@ export function buildReviewSections(checks: ReviewCheck[]): ReviewSection[] {
       status: sectionStatus(sectionChecks),
       checks: sectionChecks,
       counts: {
-        mismatch: sectionChecks.filter((check) => check.status === 'mismatch').length,
-        needs_review: sectionChecks.filter((check) => check.status === 'needs_review').length,
-        pass: sectionChecks.filter((check) => check.status === 'pass').length,
+        mismatch: sectionChecks.filter((check) => presentedStatusForCheck(check) === 'mismatch').length,
+        needs_review: sectionChecks.filter((check) => presentedStatusForCheck(check) === 'needs_review').length,
+        unverified: sectionChecks.filter((check) => presentedStatusForCheck(check) === 'unverified').length,
+        pass: sectionChecks.filter((check) => presentedStatusForCheck(check) === 'pass').length,
       },
     }
   })
 }
-

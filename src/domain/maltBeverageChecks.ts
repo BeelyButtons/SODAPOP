@@ -164,13 +164,13 @@ function importDispositionCard(rule: RuleApplicability, application: Application
   return card(rule, confidence < 68 ? 'needs_review' : 'mismatch', detected ?? 'Required post-import disposition wording not found', prohibitedImportedBy ? 'An “imported by” statement may not remain after blending or other U.S. production activity.' : `The stated disposition requires one of: ${phrases.join('; ')}.`)
 }
 
-function alcoholContentCard(rule: RuleApplicability, application: ApplicationData, text: string, confidence: number) {
+function alcoholContentCard(rule: RuleApplicability, application: ApplicationData, text: string) {
   const actual = parseAlcohol(application.alcoholContent).abv
   if (actual === null) return missingContextCard(rule, 'actual alcohol content')
   const prohibitedRange = text.match(/\b(?:at least|not more than|maximum|minimum)\b[^\n%]{0,30}\d+(?:\.\d+)?\s*%|\d+(?:\.\d+)?\s*%\s*(?:to|-)\s*\d+(?:\.\d+)?\s*%/i)?.[0]
   if (prohibitedRange) return card(rule, 'mismatch', prohibitedRange, 'Malt-beverage alcohol content may not be expressed as a range, maximum, or minimum value.')
   const observed = findAlcohol(text)
-  if (!observed) return card(rule, confidence < 68 ? 'needs_review' : 'mismatch', 'Alcohol statement not found', application.maltAlcoholFromAddedIngredients ? 'Alcohol by volume is mandatory because covered added ingredients contribute alcohol.' : 'The application or artwork indicates an alcohol statement, but OCR did not locate one.')
+  if (!observed) return card(rule, 'needs_review', 'Alcohol statement not found', application.maltAlcoholFromAddedIngredients ? 'Alcohol by volume is mandatory because covered added ingredients contribute alcohol, but SODAPOP did not locate it reliably.' : 'The application or artwork indicates an alcohol statement, but SODAPOP did not locate it reliably.')
   if (/\bABV\b/i.test(observed)) return card(rule, 'mismatch', observed, '“ABV” is not an authorized abbreviation in a malt-beverage alcohol-content statement.')
   const labeled = parseAlcohol(observed).abv
   if (labeled === null) return card(rule, 'needs_review', observed, 'OCR did not yield a reliable numerical alcohol value.')
@@ -239,7 +239,7 @@ function evaluatedRuleCard(rule: RuleApplicability, input: Input): ReviewCheck {
     case 'malt.class-type-designation': return classTypeCard(rule, application, ocrText, ocrConfidence)
     case 'malt.net-contents': return netContentsCard(rule, application, coreChecks.netContents)
     case 'malt.name-address': return nameAddressCard(rule, application, ocrText, ocrConfidence)
-    case 'malt.alcohol-content': return alcoholContentCard(rule, application, ocrText, ocrConfidence)
+    case 'malt.alcohol-content': return alcoholContentCard(rule, application, ocrText)
     case 'malt.specialty-composition': return specialtyCard(rule, application, ocrText, ocrConfidence)
     case 'malt.alcohol-characterization-claims': return alcoholClaimCard(rule, application, ocrText)
     case 'malt.country-of-origin': return countryOriginCard(rule, application, ocrText)
@@ -261,7 +261,8 @@ function evaluatedRuleCard(rule: RuleApplicability, input: Input): ReviewCheck {
 export function maltBeverageChecks(input: Input) {
   const selectedSource = input.ruleSetId === 'malt-beverage-imported' ? 'imported' : 'domestic'
   const application = { ...input.application, source: selectedSource } as ApplicationData
-  const labelAlcoholStatementPresent = Boolean(findAlcohol(input.ocrText) || /\bABV\b|\balcohol\s+(?:content|by volume)\b/i.test(input.ocrText))
+  const labelAlcoholStatementPresent = application.labelAlcoholStatementPresent === true
+    || Boolean(findAlcohol(input.ocrText) || /\bABV\b|\balcohol\s+(?:content|by volume)\b/i.test(input.ocrText))
   const evaluation = evaluateRuleSet(input.ruleSetId, {
     productType: 'malt_beverage',
     source: selectedSource,

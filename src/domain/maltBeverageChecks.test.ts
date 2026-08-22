@@ -81,6 +81,14 @@ describe('malt-beverage reviewer cards', () => {
     expect(outcome.checks.map((check) => check.id)).not.toContain('malt.import-bottling-disposition')
   })
 
+  it('keeps an application-declared alcohol statement in scope when OCR misses it', () => {
+    const outcome = review('malt-imported-pilsner', importedText.replace('4.8% ALC. BY VOL.', ''), 40)
+    expect(outcome.checks.find((check) => check.id === 'malt.alcohol-content')).toMatchObject({
+      status: 'needs_review',
+      observed: 'Alcohol statement not found',
+    })
+  })
+
   it('fails a readable imported-country conflict', () => {
     const outcome = review('malt-imported-origin-conflict', importedText.replace('PRODUCT OF GERMANY', 'PRODUCT OF AUSTRIA'))
     expect(outcome.checks.find((check) => check.id === 'malt.country-of-origin')?.status).toBe('mismatch')
