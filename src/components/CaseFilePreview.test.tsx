@@ -4,31 +4,42 @@ import { describe, expect, it, vi } from 'vitest'
 import { CaseFilePreview } from './CaseFilePreview'
 
 describe('CaseFilePreview', () => {
-  it('leads with one plain-language task and keeps records collapsed', () => {
-    render(<CaseFilePreview onBack={vi.fn()} />)
+  const previewProps = { onBack: vi.fn(), onOpenLabel: vi.fn() }
 
-    expect(screen.getByRole('heading', { name: /application conflicts with official records/i })).toBeInTheDocument()
-    expect(screen.getByText(/This is not an image-reading problem/i)).toBeInTheDocument()
+  it('leads with one plain-language task and keeps records collapsed', () => {
+    render(<CaseFilePreview {...previewProps} />)
+
+    expect(screen.getByRole('heading', { name: /case file is ready/i })).toBeInTheDocument()
+    expect(screen.getByText(/This is not an approval/i)).toBeInTheDocument()
     expect(screen.getByText(/See the records behind this result/i).closest('details')).not.toHaveAttribute('open')
   })
 
-  it('shows unsupported applicant wording as an evidence need', async () => {
+  it('shows an imported age and origin claim as an evidence need', async () => {
     const user = userEvent.setup()
-    render(<CaseFilePreview onBack={vi.fn()} />)
+    render(<CaseFilePreview {...previewProps} />)
 
-    await user.click(screen.getByRole('button', { name: /Malt beverage.*needs evidence/i }))
+    await user.selectOptions(screen.getByRole('combobox', { name: /Pilot case/i }), 'spirits-imported-protected')
 
     expect(screen.getByRole('heading', { name: /label claim has not been supported/i })).toBeInTheDocument()
     expect(screen.getByText(/applicant made the claim/i)).toBeInTheDocument()
   })
 
-  it('does not describe a complete packet as an approval', async () => {
+  it('stops before label review when a required formula is missing', async () => {
     const user = userEvent.setup()
-    render(<CaseFilePreview onBack={vi.fn()} />)
+    render(<CaseFilePreview {...previewProps} />)
 
-    await user.click(screen.getByRole('button', { name: /Wine.*ready for label review/i }))
+    await user.selectOptions(screen.getByRole('combobox', { name: /Pilot case/i }), 'wine-domestic-specialty')
 
-    expect(screen.getByRole('heading', { name: /case file is ready/i })).toBeInTheDocument()
-    expect(screen.getByText(/This is not an approval/i)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /case file is incomplete/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Continue to matching label review/i })).not.toBeInTheDocument()
+  })
+
+  it('hands a ready packet to its matching existing label review', async () => {
+    const user = userEvent.setup()
+    const onOpenLabel = vi.fn()
+    render(<CaseFilePreview onBack={vi.fn()} onOpenLabel={onOpenLabel} />)
+
+    await user.click(screen.getByRole('button', { name: /Continue to matching label review/i }))
+    expect(onOpenLabel).toHaveBeenCalledWith('valid')
   })
 })

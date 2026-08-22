@@ -15,29 +15,34 @@ function caseById(caseId: string) {
 
 describe('reviewCaseFileSchema', () => {
   it('accepts every cross-category synthetic case', () => {
+    expect(SAMPLE_REVIEW_CASES).toHaveLength(12)
     SAMPLE_REVIEW_CASES.forEach((caseFile) => {
       expect(reviewCaseFileSchema.safeParse(caseFile).success, caseFile.caseId).toBe(true)
     })
+  })
+
+  it('maps every pilot case to a different existing label scenario', () => {
+    expect(new Set(SAMPLE_REVIEW_CASES.map((caseFile) => caseFile.sampleLabelId)).size).toBe(12)
   })
 })
 
 describe('resolveClaimEvidence', () => {
   it('does not treat an applicant assertion as substantiation', () => {
-    const caseFile = caseById('malt-geographic-claim-unsupported')
+    const caseFile = caseById('spirits-imported-protected')
     const resolution = resolveClaimEvidence(caseFile, caseFile.claims[0])
 
     expect(resolution.status).toBe('missing')
   })
 
   it('gives contradictory authoritative evidence priority over an application assertion', () => {
-    const caseFile = caseById('spirits-formula-conflict')
+    const caseFile = caseById('malt-domestic-specialty')
     const resolution = resolveClaimEvidence(caseFile, caseFile.claims[0])
 
     expect(resolution.status).toBe('contradicted')
   })
 
   it('recognizes qualifying production records that support wine claims', () => {
-    const caseFile = caseById('wine-import-packet-complete')
+    const caseFile = caseById('wine-domestic-claims')
 
     expect(resolveClaimEvidence(caseFile, caseFile.claims[0]).status).toBe('supported')
     expect(resolveClaimEvidence(caseFile, caseFile.claims[1]).status).toBe('supported')
@@ -46,22 +51,21 @@ describe('resolveClaimEvidence', () => {
 
 describe('evaluatePacketReadiness', () => {
   it.each([
-    ['spirits-formula-conflict', 'needs_correction'],
-    ['wine-import-packet-complete', 'ready_for_label_review'],
-    ['malt-geographic-claim-unsupported', 'needs_evidence'],
+    ['spirits-domestic-standard', 'ready_for_label_review'],
+    ['spirits-imported-protected', 'needs_evidence'],
+    ['wine-domestic-specialty', 'cannot_review'],
+    ['malt-domestic-specialty', 'needs_correction'],
   ] as const)('classifies %s as %s', (caseId, expected) => {
     expect(evaluatePacketReadiness(caseById(caseId)).status).toBe(expected)
   })
 
   it('blocks review when a required label panel is absent', () => {
-    const completeCase = caseById('wine-import-packet-complete')
+    const completeCase = caseById('wine-imported')
     const incompleteCase: ReviewCaseFile = {
       ...completeCase,
       labelPackage: {
         ...completeCase.labelPackage,
-        panels: completeCase.labelPackage.panels.map((panel, index) => (
-          index === 1 ? { ...panel, present: false } : panel
-        )),
+        panels: completeCase.labelPackage.panels.map((panel) => ({ ...panel, present: false })),
       },
     }
 

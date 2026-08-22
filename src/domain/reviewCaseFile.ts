@@ -59,6 +59,7 @@ export const reviewClaimSchema = z.object({
 
 export const reviewCaseFileSchema = z.object({
   caseId: z.string().trim().min(1),
+  sampleLabelId: z.string().trim().min(1),
   title: z.string().trim().min(1),
   application: applicationSchema,
   applicantAuthorization: z.object({

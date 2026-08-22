@@ -19,7 +19,7 @@ SODAPOP — System for Optical Detection, Analysis & Packaging-Oversight Process
 - Reversible results-layout comparison: working on the feature branch; the current card view remains the default while a simplified preview groups every spirits, wine, and malt review into the same seven sections
 - Simplified section decisions: working; passed sections can be accepted together, related requirements stay available in collapsed details, and one section decision is recorded across its underlying checks
 - Recognition uncertainty separation: working in the simplified preview; failure to locate text is shown as `Not automatically verified`, while positively observed contradictions remain potential problems
-- Reviewer case-file preview: implemented alongside the current workflow, with three cross-category synthetic cases that separate application assertions, authorization results, product determinations, supporting evidence, label-package records, claims, and history; live review integration remains intentionally deferred
+- Reviewer case-file pilot: implemented alongside the current workflow, with twelve mapped spirits, wine, and malt cases that separate application assertions, authorization results, product determinations, supporting evidence, label-package records, claims, and history; review-ready packets can continue to their matching existing label review while blocked packets stop before OCR
 - Final decision rule and submission control: working
 - Synthetic compliant, failure, varied-layout, and difficult-photo cases: included
 - Pre-malt expanded-case benchmark: 3.6–4.9 seconds on clear, conditional, blurred, and obstructed samples with a warm OCR engine; the varied malt queue is the current hands-on performance check
@@ -27,7 +27,7 @@ SODAPOP — System for Optical Detection, Analysis & Packaging-Oversight Process
 - Angled-label deskewing and orientation-aware highlights: working
 - Rule-aware OCR recovery: working, with a two-pass limit, a 4.8-second recovery budget, selective upside-down recovery, and complementary evidence merging
 - URL-aware SPA views for the queue, individual cases, new-label intake, and results: working
-- Automated verification: 222 routing, rule-coverage, interface, OCR, decision-workflow, case-file, and regression tests passing, plus GitHub Pages production-build and lint checks
+- Automated verification: 225 routing, rule-coverage, interface, OCR, decision-workflow, case-file, and regression tests passing, plus GitHub Pages production-build and lint checks
 - Post-rule-expansion routing foundation: working, with seven TTB review/routing rule sets, tri-state applicability, automatic selection, transparent selection reasons, and reviewer overrides
 - Cached-evidence rule-set reanalysis: working without a second OCR pass; alternative rule sets are ranked only when the reviewer opens the rule control
 - Centered rule-set window: working with a pinned close control, outside-click and Escape dismissal, applicable-first rule details, collapsed non-applicable rules, focus restoration, and a compact alternative selector

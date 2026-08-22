@@ -9,6 +9,7 @@ import {
 
 type Props = {
   onBack: () => void
+  onOpenLabel: (sampleLabelId: string) => void
 }
 
 const productLabels: Record<ReviewCaseFile['application']['productType'], string> = {
@@ -101,9 +102,10 @@ function authorityLabel(authority: ReviewCaseFile['evidence'][number]['authority
   return 'Applicant statement'
 }
 
-export function CaseFilePreview({ onBack }: Props) {
+export function CaseFilePreview({ onBack, onOpenLabel }: Props) {
   const [selectedId, setSelectedId] = useState<string>(SAMPLE_REVIEW_CASES[0].caseId)
   const caseFile = SAMPLE_REVIEW_CASES.find((candidate) => candidate.caseId === selectedId) as ReviewCaseFile
+  const selectedIndex = SAMPLE_REVIEW_CASES.findIndex((candidate) => candidate.caseId === selectedId)
   const readiness = useMemo(() => evaluatePacketReadiness(caseFile), [caseFile])
   const copy = readinessCopy[readiness.status]
   const sections = caseSections(caseFile)
@@ -131,35 +133,61 @@ export function CaseFilePreview({ onBack }: Props) {
         <div>
           <p className="eyebrow">Separate preview · No current reviews changed</p>
           <h1 id="case-preview-title">Document-aware case review</h1>
-          <p>Choose a simple example to see how application claims, official records, and label evidence are kept separate.</p>
+          <p>Choose one of twelve pilot cases covering domestic and imported spirits, wine, and malt beverages.</p>
         </div>
         <button className="secondary-button" type="button" onClick={onBack}>← Review queue</button>
       </header>
 
-      <nav className="case-example-picker" aria-label="Synthetic case examples">
-        {SAMPLE_REVIEW_CASES.map((candidate) => {
-          const candidateReadiness = evaluatePacketReadiness(candidate as ReviewCaseFile)
-          return (
-            <button
-              type="button"
-              className={candidate.caseId === selectedId ? 'selected' : ''}
-              aria-pressed={candidate.caseId === selectedId}
-              onClick={() => setSelectedId(candidate.caseId)}
-              key={candidate.caseId}
-            >
-              <span>{productLabels[candidate.application.productType]}</span>
-              <strong>{candidate.title}</strong>
-              <small>{readinessCopy[candidateReadiness.status].label}</small>
-            </button>
-          )
-        })}
-      </nav>
+      <section className="case-example-control" aria-label="Synthetic case examples">
+        <label>
+          <span>Pilot case {selectedIndex + 1} of {SAMPLE_REVIEW_CASES.length}</span>
+          <select value={selectedId} onChange={(event) => setSelectedId(event.target.value)}>
+            {(['distilled_spirits', 'wine', 'malt_beverage'] as const).map((productType) => (
+              <optgroup label={productLabels[productType]} key={productType}>
+                {SAMPLE_REVIEW_CASES.filter((candidate) => candidate.application.productType === productType).map((candidate) => {
+                  const candidateReadiness = evaluatePacketReadiness(candidate)
+                  return <option value={candidate.caseId} key={candidate.caseId}>{candidate.title} — {readinessCopy[candidateReadiness.status].label}</option>
+                })}
+              </optgroup>
+            ))}
+          </select>
+        </label>
+        <div>
+          <button
+            className="secondary-button"
+            type="button"
+            disabled={selectedIndex === 0}
+            onClick={() => setSelectedId(SAMPLE_REVIEW_CASES[selectedIndex - 1].caseId)}
+          >
+            ← Previous case
+          </button>
+          <button
+            className="secondary-button"
+            type="button"
+            disabled={selectedIndex === SAMPLE_REVIEW_CASES.length - 1}
+            onClick={() => setSelectedId(SAMPLE_REVIEW_CASES[selectedIndex + 1].caseId)}
+          >
+            Next case →
+          </button>
+        </div>
+      </section>
 
       <article className={`case-primary-task case-primary-${readiness.status}`} aria-live="polite">
+        <div className="case-current-context">
+          <span>{productLabels[caseFile.application.productType]} · {caseFile.application.source === 'imported' ? 'Imported' : 'Domestic'}</span>
+          <strong>{caseFile.title}</strong>
+        </div>
         <p>{copy.label}</p>
         <h2>{copy.heading}</h2>
         <p>{copy.explanation}</p>
         <div><strong>Reviewer’s next step</strong><span>{copy.action}</span></div>
+        {readiness.status === 'ready_for_label_review' ? (
+          <button className="primary-button case-continue-button" type="button" onClick={() => onOpenLabel(caseFile.sampleLabelId)}>
+            Continue to matching label review <span aria-hidden="true">→</span>
+          </button>
+        ) : (
+          <p className="case-review-paused">Label review is paused until this case-file issue is resolved.</p>
+        )}
       </article>
 
       <section className="case-fact-comparison" aria-labelledby="case-comparison-title">
@@ -201,6 +229,7 @@ export function CaseFilePreview({ onBack }: Props) {
       <details className="case-evidence-details">
         <summary>See the records behind this result ({caseFile.evidence.length})</summary>
         <div>
+          {caseFile.evidence.length === 0 && <p className="case-no-evidence">No additional supporting record is attached to this pilot case.</p>}
           {caseFile.evidence.map((record) => (
             <article key={record.id}>
               <span>{authorityLabel(record.authority)}</span>

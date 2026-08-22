@@ -1,6 +1,6 @@
 # SODAPOP reviewer case-file specification
 
-Status: **Foundation and isolated synthetic-case preview implemented; live review integration deferred.**
+Status: **Foundation and twelve-case guarded pilot implemented; full-queue integration deferred.**
 
 ## Purpose
 
@@ -114,7 +114,7 @@ Synthetic cases must contain no real confidential formula or permit data. Each c
 - incomplete label panels or translations; and
 - correction/resubmission history.
 
-At least one representative case is required for distilled spirits, wine, and malt beverages before UI integration.
+The pilot contains twelve mapped cases: domestic standard and specialty spirits; imported protected spirits; exemption/distinctive-bottle review; domestic wine claims; domestic specialty wine; imported wine; wine below 7 percent; ordinary and specialty domestic malt beverages; imported bottled malt beverages; and imported malt beverages packaged in the United States.
 
 ## Public authority baseline
 
@@ -131,4 +131,4 @@ At least one representative case is required for distilled spirits, wine, and ma
 
 ## Deferred work
 
-This phase does not change the application form, results screen, OCR pipeline, or existing rule outcomes. A reviewer-facing packet summary is available at the isolated `/case-files` preview route using three synthetic cases. Only after hands-on approval of that preview should the case-file model feed the live verification engine.
+This phase does not change the application form, results screen, OCR pipeline, or existing rule outcomes. A reviewer-facing packet summary is available at the isolated `/case-files` route using twelve synthetic cases mapped to existing label scenarios. Review-ready packets may continue to the matching existing label review; cases needing evidence, correction, or a required document stop before that handoff. Only after hands-on approval should the case-file model be expanded across the full queue.

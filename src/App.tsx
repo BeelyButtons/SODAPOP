@@ -283,6 +283,11 @@ function App() {
     navigate(`/review/${id}`)
   }
 
+  function openPilotLabelReview(sampleLabelId: string) {
+    const sample = SAMPLE_LABELS.find((candidate) => candidate.id === sampleLabelId)
+    if (sample) openQueueCase(sample.id)
+  }
+
   function startQueue() {
     const next = nextRemainingSample(queueProgress)
     if (next) openQueueCase(next.id)
@@ -461,7 +466,9 @@ function App() {
           />
         )}
 
-        {route === '/case-files' && <CaseFilePreview onBack={() => navigate('/review')} />}
+        {route === '/case-files' && (
+          <CaseFilePreview onBack={() => navigate('/review')} onOpenLabel={openPilotLabelReview} />
+        )}
 
         {route === '/review/completed' && (
           <CompletedReviews progress={queueProgress} onBack={() => navigate('/review')} onOpen={openCompletedReview} />
