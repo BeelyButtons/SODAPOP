@@ -62,4 +62,17 @@ describe('App', () => {
     expect(completedLink).toHaveClass('active')
     expect(screen.getByRole('heading', { name: /Completed label review decisions/i })).toBeInTheDocument()
   })
+
+  it('opens the document-aware preview without replacing the review queue', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: /Preview document-aware review/i }))
+
+    expect(window.location.pathname).toBe('/case-files')
+    expect(screen.getByRole('heading', { name: /Document-aware case review/i })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /Review queue/i }))
+    expect(window.location.pathname).toBe('/review')
+    expect(screen.getByRole('heading', { name: 'Labels to Review' })).toBeInTheDocument()
+  })
 })

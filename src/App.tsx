@@ -4,6 +4,7 @@ import { ApplicationForm } from './components/ApplicationForm'
 import { ReviewResults } from './components/ReviewResults'
 import { ReviewPortal } from './components/ReviewPortal'
 import { CompletedReviews } from './components/CompletedReviews'
+import { CaseFilePreview } from './components/CaseFilePreview'
 import { UploadPanel } from './components/UploadPanel'
 import { RuleSetReference } from './components/RuleSetReference'
 import { SAMPLE_LABELS, createSampleFile } from './data/sampleLabels'
@@ -99,6 +100,8 @@ function App() {
       ? `${ruleSetReference.label} rules · SODAPOP`
       : route === '/review'
       ? 'Review portal · SODAPOP'
+      : route === '/case-files'
+        ? 'Document-aware case review · SODAPOP'
       : route === '/review/completed'
         ? 'Completed reviews · SODAPOP'
       : route === '/review/new'
@@ -453,9 +456,12 @@ function App() {
             onStart={startQueue}
             onSelect={openQueueCase}
             onCompleted={openCompletedReviews}
+            onCasePreview={() => navigate('/case-files')}
             onReset={resetQueue}
           />
         )}
+
+        {route === '/case-files' && <CaseFilePreview onBack={() => navigate('/review')} />}
 
         {route === '/review/completed' && (
           <CompletedReviews progress={queueProgress} onBack={() => navigate('/review')} onOpen={openCompletedReview} />

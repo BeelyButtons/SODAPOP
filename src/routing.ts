@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 
-export type AppRoute = '/review' | '/review/new' | '/results' | `/review/${string}` | `/rules/${string}`
+export type AppRoute = '/review' | '/review/new' | '/case-files' | '/results' | `/review/${string}` | `/rules/${string}`
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '')
 
@@ -10,7 +10,7 @@ export function appUrl(route: AppRoute) {
 
 function currentRoute(): AppRoute {
   const path = window.location.pathname.slice(basePath.length) || '/review'
-  if (path === '/results' || path === '/review/new' || path.startsWith('/review/') || path.startsWith('/rules/')) {
+  if (path === '/results' || path === '/review/new' || path === '/case-files' || path.startsWith('/review/') || path.startsWith('/rules/')) {
     return path as AppRoute
   }
   return '/review'

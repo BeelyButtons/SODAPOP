@@ -1,6 +1,6 @@
 # SODAPOP reviewer case-file specification
 
-Status: **Foundation approved for implementation; reviewer interface integration deferred.**
+Status: **Foundation and isolated synthetic-case preview implemented; live review integration deferred.**
 
 ## Purpose
 
@@ -131,4 +131,4 @@ At least one representative case is required for distilled spirits, wine, and ma
 
 ## Deferred work
 
-This phase does not change the application form, results screen, OCR pipeline, or existing rule outcomes. The next approval point is a reviewer-facing packet summary using synthetic cases. Only after that review should the case-file model feed the live verification engine.
+This phase does not change the application form, results screen, OCR pipeline, or existing rule outcomes. A reviewer-facing packet summary is available at the isolated `/case-files` preview route using three synthetic cases. Only after hands-on approval of that preview should the case-file model feed the live verification engine.

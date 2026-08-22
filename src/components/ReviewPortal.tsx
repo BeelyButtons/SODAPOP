@@ -13,6 +13,7 @@ type Props = {
   onStart: () => void
   onSelect: (id: (typeof SAMPLE_LABELS)[number]['id']) => void
   onCompleted: () => void
+  onCasePreview: () => void
   onReset: () => void
 }
 
@@ -34,7 +35,7 @@ function queueRow(sample: (typeof SAMPLE_LABELS)[number]) {
   }
 }
 
-export function ReviewPortal({ progress, onStart, onSelect, onCompleted, onReset }: Props) {
+export function ReviewPortal({ progress, onStart, onSelect, onCompleted, onCasePreview, onReset }: Props) {
   const [confirmingReset, setConfirmingReset] = useState(false)
   const [query, setQuery] = useState('')
   const [productFilter, setProductFilter] = useState<ProductFilter>('all')
@@ -80,6 +81,7 @@ export function ReviewPortal({ progress, onStart, onSelect, onCompleted, onReset
         <button className="primary-button" type="button" disabled={remainingSamples.length === 0} onClick={onStart}>
           Start / Restart label reviews <span aria-hidden="true">→</span>
         </button>
+        <button className="secondary-button" type="button" onClick={onCasePreview}>Preview document-aware review</button>
         {completed > 0 && (
           <button className="secondary-button" type="button" onClick={onCompleted}>View completed label review decisions</button>
         )}
