@@ -147,6 +147,8 @@ function App() {
           imageHeight: ocr.imageHeight,
           ocrAttempts: ocr.attempts,
           ocrRotationDegrees: (ocr.rotationRadians * 180) / Math.PI,
+          ocrPassTimingsMs: ocr.passTimingsMs,
+          ocrRetryReason: ocr.retryReason,
         }))
       } catch (error) {
         if (!cancelled) {
@@ -254,6 +256,8 @@ function App() {
           imageHeight: ocr.imageHeight,
           ocrAttempts: ocr.attempts,
           ocrRotationDegrees: (ocr.rotationRadians * 180) / Math.PI,
+          ocrPassTimingsMs: ocr.passTimingsMs,
+          ocrRetryReason: ocr.retryReason,
         })
       setResult(nextResult)
       navigate('/results')
@@ -380,6 +384,8 @@ function App() {
         imageHeight: result.imageHeight,
         ocrAttempts: result.ocrAttempts,
         ocrRotationDegrees: result.ocrRotationDegrees,
+        ocrPassTimingsMs: result.ocrPassTimingsMs,
+        ocrRetryReason: result.ocrRetryReason,
         ruleSelection: selection,
       })
       nextResult.ruleSelection = {

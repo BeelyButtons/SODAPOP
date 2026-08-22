@@ -18,12 +18,12 @@ SODAPOP — System for Optical Detection, Analysis & Packaging-Oversight Process
 - View-gated bulk Pass for remaining green findings only: working; red and amber findings always require individual review
 - Final decision rule and submission control: working
 - Synthetic compliant, failure, varied-layout, and difficult-photo cases: included
-- Expanded-case local benchmark: 3.6–4.9 seconds on clear, conditional, blurred, and obstructed samples with a warm OCR engine
+- Pre-malt expanded-case benchmark: 3.6–4.9 seconds on clear, conditional, blurred, and obstructed samples with a warm OCR engine; the varied malt queue is the current hands-on performance check
 - Coordinate-backed label highlighting: working, including combined regions for multiple visually detected facts used by one finding
 - Angled-label deskewing and orientation-aware highlights: working
-- Conditional glare and alternate-orientation OCR retries: working
+- Rule-aware OCR recovery: working, with a two-pass limit, a 4.8-second recovery budget, selective upside-down recovery, and complementary evidence merging
 - URL-aware SPA views for the queue, individual cases, new-label intake, and results: working
-- Automated verification: 160 routing, rule-coverage, interface, OCR, decision-workflow, and regression tests passing, plus GitHub Pages production-build and lint checks
+- Automated verification: 198 routing, rule-coverage, interface, OCR, decision-workflow, and regression tests passing, plus GitHub Pages production-build and lint checks
 - Post-rule-expansion routing foundation: working, with seven TTB review/routing rule sets, tri-state applicability, automatic selection, transparent selection reasons, and reviewer overrides
 - Cached-evidence rule-set reanalysis: working without a second OCR pass; alternative rule sets are ranked only when the reviewer opens the rule control
 - Centered rule-set window: working with a pinned close control, outside-click and Escape dismissal, applicable-first rule details, collapsed non-applicable rules, focus restoration, and a compact alternative selector
@@ -31,6 +31,8 @@ SODAPOP — System for Optical Detection, Analysis & Packaging-Oversight Process
 - Distilled-spirits regression queue: 23 cases spanning clear matches, explicit conflicts, missing context, incorrect routing, formula disclosures, permitted age understatement, prohibited age overstatement, glare, blur, low contrast, perspective, rotation, and partial obstruction
 - Expanded wine review: working for domestic and imported wines at 7% alcohol or more, plus the TTB domestic-wine labeling and health-warning branch below 7%
 - Wine regression queue: 11 cases spanning supported and conflicting appellation/varietal evidence, estate bottling, imported origin, formula disclosures, below-7% complete and incomplete labels, and glare
+- Expanded malt-beverage review: working for domestic/imported base requirements, specialty products, conditional alcohol statements and claims, post-import bottling, geography, formula instructions, and additive disclosures
+- Malt-beverage regression queue: 13 cases using six deliberately different design systems plus glare and angled-photo treatments; the total demonstration queue now contains 47 labels
 - Batch review: planned after the single-label workflow is validated
 - Live URL: [https://beelybuttons.github.io/SODAPOP/](https://beelybuttons.github.io/SODAPOP/)
 
@@ -67,6 +69,8 @@ SODAPOP — System for Optical Detection, Analysis & Packaging-Oversight Process
 29. Exercises every distilled-spirits conditional rule through `applies`, `does not apply`, and `missing context` tests, so missing application facts cannot silently route a conditional check away.
 30. Applies domestic and imported wine rules for alcohol statements, responsible-party information, brand-label placement, country of origin, appellation, varietal, vintage, estate bottling, foreign-wine percentage, formula composition, sulfites, Yellow No. 5, and cochineal/carmine disclosures.
 31. Routes domestic wine below 7% alcohol out of Part 4 while still checking the Part 24 premises name/address, brand when different, alcohol content, net contents, kind of wine, and the Part 16 health warning when applicable; FDA rules remain outside this TTB prototype.
+32. Applies domestic and imported malt-beverage rules for brand, recognized or specialty identity, U.S.-unit net contents, responsible-party information, conditional alcohol content, low/non-alcoholic claims, country of origin, post-import bottling, geographic qualification, formula directions, sulfites, aspartame, Yellow No. 5, and cochineal/carmine.
+33. Distinguishes ordinary malt beverages from formula-backed specialties and reserves alcohol-content cards for statements that are mandatory, voluntarily displayed, or otherwise activated by the review evidence.
 
 The application uses meaningful browser routes even though it remains a client-side SPA:
 
@@ -103,6 +107,10 @@ The first distilled-spirits hardening pass then tested every conditional branch 
 
 The project owner then directed the wine expansion to remain firmly within TTB's review role: domestic and imported branches, explicit jurisdiction routing below 7% alcohol, strong automated recommendations wherever the evidence supports them, and staff Pass/Fail on every applicable card. That direction corrected an important early simplification. Domestic wine below 7% is not merely a warning-routing case; TTB's Part 24 guidance also requires premises name/address, brand when different, alcohol content, net contents, and kind-of-wine evidence. The implemented wine engine now covers those requirements plus the Part 4 alcohol, responsibility, origin, appellation, varietal, vintage, estate, formula, sulfite, and color-additive branches. Eleven visibly varied wine cases bring the demonstration queue to 34 labels. Live browser OCR checks completed clear, imported, formula, below-7%, and glare cases in 1.8–2.3 seconds on the development machine.
 
+For the malt-beverage increment, the project owner explicitly rejected the visual sameness common to synthetic regression labels. That direction changed the fixture strategy as well as the rule engine. The 13 new cases use circular mid-century can graphics, a narrow European heritage bottle, neon fruit-forward specialty artwork, spacious low/non-alcohol typography, blueprint-style geographic labeling, and an industrial post-import can instead of recycling one rectangular template with different colors. The cases cover domestic and imported products, origin conflicts, formula omissions and composition conflicts, low/non-alcoholic thresholds, geographic qualification, U.S. post-import canning, glare, and off-axis photography. This makes OCR and reviewer testing more representative of the variety encountered in real label artwork.
+
+Testing those more varied malt labels exposed a service problem that uniform artwork had hidden: the OCR quality gate always searched for the same five fields, even when a malt alcohol statement or government warning was not applicable. Busy designs could therefore trigger repeated full-image scans, take roughly 12.5 seconds, and still discard text that appeared only in a secondary pass. At the project owner's direction, the correction improves the service rather than making the test artwork easier. OCR evidence is now selected from the actual beverage rules and application facts, equivalent volume statements tolerate ordinary conversion rounding, and the fast path is followed by no more than one targeted recovery pass. That recovery uses a complementary page-layout mode for dense text, tries an upside-down orientation only when the first result is nearly empty, and returns within a 4.8-second recovery budget instead of starting 90-degree scans. Text and coordinates from successful passes are merged so one pass can contribute the brand while another contributes a disclosure. Pass timings and the retry reason are retained with the review outcome for performance diagnosis without adding reviewer clicks.
+
 ### Review queue and accessibility improvements
 
 - Every unfinished synthetic case is visible in a semantic table with its purpose, product, source, automatically selected rule set, status, and direct Review action.
@@ -134,21 +142,25 @@ Hands-on review of the angled Ember & Ash and glare-affected Harbor Light exampl
 
 - Small label images are upscaled before recognition so regulatory text receives enough pixels.
 - Tesseract automatic rotation is enabled for ordinary skewed photographs.
-- When expected evidence remains weak, SODAPOP conditionally retries with local adaptive thresholding designed for uneven lighting and glare.
-- Difficult orientations are retried at 180°, 90°, and -90° only when earlier passes do not meet the quality gate.
-- The best OCR attempt is selected using expected application fields and warning evidence, not overall OCR confidence alone.
+- Expected evidence is derived from the selected beverage context. Optional malt alcohol statements and government warnings below 0.5 percent alcohol no longer create false missing-evidence penalties, while imported origin and conditional formula evidence are included when applicable.
+- When required evidence remains weak, SODAPOP permits one recovery pass with local adaptive thresholding and a complementary dense-layout reading mode designed for uneven lighting, busy artwork, and small disclosures.
+- An upside-down retry is reserved for nearly empty, low-confidence first passes. Costly 90-degree retry loops are no longer part of the automatic path.
+- Recovery work is limited to two total whole-image passes and a 4.8-second result budget. If the recovery pass reaches that budget, the first-pass evidence is returned instead of making the reviewer wait for more scans.
+- Successful passes are merged rather than forcing one winner to contain every fact. Complementary text and non-duplicate word coordinates remain available for matching and highlights.
+- The primary pass is still selected using applicable application fields and warning evidence, not overall OCR confidence alone.
+- Per-pass timing and retry-reason diagnostics travel with the review outcome so slow cases can be investigated without exposing more controls to reviewers.
 - Field matching retains OCR line geometry so nearby values such as `750 mL` are less likely to be absorbed into class/type.
 - Meaningful brand punctuation, including `&`, is preserved instead of being silently normalized away.
 - OCR boxes are transformed back onto the original photograph and rendered as polygons, allowing highlights to follow angled words.
 - A warning that OCR cannot confidently locate is sent to staff review rather than automatically treated as a confirmed mismatch. A detected substitute statement or conflicting wording can still produce a mismatch.
 
-These changes use the existing performance budget intelligently: clean images keep the fast path, while difficult images receive extra processing instead of an artificial delay.
+These changes use the existing performance budget intelligently: clean images keep the fast path, while difficult images receive one bounded opportunity to recover useful evidence. Browser timing still depends on the review device, image size, and whether the local OCR engine is already warm, so the varied malt queue remains the practical end-to-end performance test.
 
 ## Why this architecture
 
 ```text
-Label image → upscale/contrast → orientation-aware OCR → quality gate
-                              ↘ conditional enhanced/rotated retries ↗
+Label image → upscale/contrast → rule-aware OCR → evidence quality gate
+                              ↘ one bounded recovery pass ↗
                                                      ↓
                                            structured extraction
                                                      ↓
@@ -160,7 +172,7 @@ Application values → validation → deterministic comparison rules → review 
 - **Tesseract.js:** zero-cost local OCR with no external ML endpoint at review time.
 - **Deterministic verification:** exact and numeric regulatory checks do not depend on generative-model judgment.
 - **Quality-gated retries:** extra OCR work is performed only when expected label evidence remains incomplete.
-- **Rule-driven beverage evaluation:** applicable distilled-spirits and wine rules become evidence cards using COLA, formula, permit, production, and OCR facts.
+- **Rule-driven beverage evaluation:** applicable distilled-spirits, wine, and malt-beverage rules become evidence cards using COLA, formula, permit, production, and OCR facts.
 - **No database or accounts:** only demonstration-queue decisions are persisted in browser storage; images and extracted label content remain in memory.
 - **Static deployment:** the current slice can run on GitHub Pages without a paid backend.
 
@@ -185,6 +197,7 @@ The real process uses COLAs Online or [TTB Form 5100.31](https://www.ttb.gov/med
 - Imported country-of-origin and bottling-disposition facts
 - Conditional composition and production facts for solids, neutral spirits, age, wood treatment, State of distillation, color additives, sulfites, and aspartame
 - Wine origin, appellation type and percentage, varietal composition, vintage support, estate-production continuity, foreign-law support, and foreign-wine blend percentage
+- Malt specialty, alcohol-contribution, displayed-alcohol, alcohol-characterization, geographic-designation, and post-import bottling facts
 
 Class/type is included because it is part of the exercise’s expected review, even though it is not necessarily entered as an independent field on every current COLA application. A future integration should map from the authoritative COLAs Online data contract rather than this prototype form.
 
@@ -261,7 +274,7 @@ public/ocr/          Same-origin OCR worker, runtime, and language assets
 
 ## Assumptions and limitations
 
-- Automatic rule-set routing covers distilled spirits, wine, and malt beverages. Distilled-spirits and wine cards are expanded for their implemented domestic/imported base and conditional rules. Malt-beverage cards remain the next rule-engine increment.
+- Automatic rule-set routing and reviewer cards now cover distilled spirits, wine, and malt beverages across the implemented domestic/imported base and conditional branches.
 - This prototype uses manual application entry. Batch CSV input comes next.
 - OCR accuracy still depends on image quality. Included glare, perspective, upside-down, varied-layout, and reverse-type fixtures expose these limitations for staff evaluation and regression testing.
 - The five-second result is a development-machine measurement on synthetic fixtures, not a service-level guarantee.
@@ -275,8 +288,7 @@ The current implementation has no application runtime fee: all processing is loc
 
 ## Next increment
 
-1. Project-owner review of the expanded wine cards and 11-case wine regression set.
+1. Project-owner review of the expanded malt-beverage cards and 13-case visually varied malt regression set.
 2. Refine any recommendation or sample that hands-on review exposes as misleading, overly confident, or unnecessarily manual.
-3. Expand malt-beverage cards while preserving automatic routing, tri-state applicability, cached evidence, and staff Pass/Fail for every applicable item.
-4. Test difficult and incomplete application packets and label photos across all implemented beverage categories.
-5. Return to batch intake and export only after the single-label rule-expanded workflow is accepted.
+3. Test difficult and incomplete application packets and label photos systematically across all three beverage categories.
+4. Return to batch intake and export only after the single-label rule-expanded workflow is accepted.

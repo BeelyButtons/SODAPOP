@@ -35,6 +35,19 @@ type SampleVariant =
   | 'wine-under-seven-complete'
   | 'wine-under-seven-missing'
   | 'wine-glare-photo'
+  | 'malt-domestic-lager'
+  | 'malt-imported-pilsner'
+  | 'malt-imported-origin-conflict'
+  | 'malt-specialty-complete'
+  | 'malt-specialty-missing'
+  | 'malt-specialty-conflict'
+  | 'malt-non-alcoholic'
+  | 'malt-low-alcohol-conflict'
+  | 'malt-geographic-qualified'
+  | 'malt-geographic-conflict'
+  | 'malt-post-import-complete'
+  | 'malt-glare-photo'
+  | 'malt-photo-perspective'
 
 export type SampleLabel = {
   id: SampleVariant
@@ -330,6 +343,132 @@ const UNDER_SEVEN_WINE_APPLICATION: ApplicationData = {
   productionFacts: 'Domestic still apple wine bottled at the qualified wine premises.',
 }
 
+const DOMESTIC_MALT_APPLICATION: ApplicationData = {
+  ...INITIAL_APPLICATION,
+  productType: 'malt_beverage',
+  source: 'domestic',
+  brandName: 'HIGHLINE BREWING',
+  classType: 'LAGER',
+  alcoholContent: '5.2% Alc. by Vol.',
+  netContents: '12 FL OZ',
+  containerVolumeMl: 354.882,
+  applicantName: 'HIGHLINE BREWING COMPANY',
+  applicantAddress: 'DENVER, COLORADO',
+  permitName: 'HIGHLINE BREWING COMPANY',
+  permitAddress: 'DENVER, COLORADO',
+  formulaRequired: false,
+  formulaId: '',
+  formulaClassType: '',
+  formulaCompositionStatement: '',
+  formulaLabelingInstructions: '',
+  fancifulName: '',
+  labelDimensions: 'Complete wraparound can label; 7.5 × 4.75 inches',
+  labelSet: true,
+  bottleMarkings: 'None documented',
+  containsYellow5: false,
+  containsCochinealOrCarmine: false,
+  sulfitesPpm: 0,
+  containsAspartame: false,
+  maltAlcoholFromAddedIngredients: false,
+  labelAlcoholStatementPresent: false,
+  maltAlcoholCharacterizationClaim: false,
+  maltGeographicClaim: false,
+  maltSpecialtyProduct: false,
+  maltPostImportBottling: false,
+  productionFacts: 'Domestic lager brewed and canned in Denver, Colorado.',
+}
+
+const IMPORTED_MALT_APPLICATION: ApplicationData = {
+  ...DOMESTIC_MALT_APPLICATION,
+  source: 'imported',
+  brandName: 'KRONENFELD',
+  classType: 'PILSNER BEER',
+  alcoholContent: '4.8% Alc. by Vol.',
+  netContents: '11.2 FL OZ (330 mL)',
+  containerVolumeMl: 330,
+  applicantName: 'NORTH ATLANTIC BEVERAGE IMPORTS',
+  applicantAddress: 'BOSTON, MASSACHUSETTS',
+  permitName: 'NORTH ATLANTIC BEVERAGE IMPORTS',
+  permitAddress: 'BOSTON, MASSACHUSETTS',
+  importCountryOfOrigin: 'GERMANY',
+  labelAlcoholStatementPresent: true,
+  importBottlingDisposition: 'Bottled in country of origin',
+  maltPostImportBottling: false,
+  productionFacts: 'Brewed and bottled in Hamburg, Germany; imported in the labeled bottle.',
+}
+
+const SPECIALTY_MALT_APPLICATION: ApplicationData = {
+  ...DOMESTIC_MALT_APPLICATION,
+  brandName: 'CITRUS STATIC',
+  classType: 'MALT BEVERAGE WITH NATURAL TANGERINE FLAVOR AND ARTIFICIAL COLOR',
+  fancifulName: 'POP ORBIT',
+  alcoholContent: '6.0% Alc. by Vol.',
+  formulaRequired: true,
+  formulaId: 'MB-2026-0881',
+  formulaClassType: 'MALT BEVERAGE SPECIALTY',
+  formulaCompositionStatement: 'MALT BEVERAGE WITH NATURAL TANGERINE FLAVOR AND ARTIFICIAL COLOR',
+  formulaLabelingInstructions: 'MALT BEVERAGE WITH NATURAL TANGERINE FLAVOR AND ARTIFICIAL COLOR|CONTAINS FD&C YELLOW NO. 5|CONTAINS SULFITES|CONTAINS CARMINE|PHENYLKETONURICS: CONTAINS PHENYLALANINE',
+  applicantName: 'CITRUS STATIC BREW LAB',
+  applicantAddress: 'AUSTIN, TEXAS',
+  permitName: 'CITRUS STATIC BREW LAB',
+  permitAddress: 'AUSTIN, TEXAS',
+  containsYellow5: true,
+  containsCochinealOrCarmine: true,
+  sulfitesPpm: 16,
+  containsAspartame: true,
+  maltAlcoholFromAddedIngredients: true,
+  labelAlcoholStatementPresent: true,
+  maltSpecialtyProduct: true,
+  productionFacts: 'Formula documents natural tangerine flavor, artificial color from carmine and Yellow No. 5, sulfites, aspartame, and alcohol contributed by a compounded flavor.',
+}
+
+const NON_ALCOHOLIC_MALT_APPLICATION: ApplicationData = {
+  ...DOMESTIC_MALT_APPLICATION,
+  brandName: 'CLEAR CURRENT',
+  classType: 'MALT BEVERAGE',
+  alcoholContent: '0.4% Alc. by Vol.',
+  labelAlcoholStatementPresent: true,
+  maltAlcoholCharacterizationClaim: true,
+  productionFacts: 'Laboratory result: 0.4 percent alcohol by volume.',
+}
+
+const LOW_ALCOHOL_CONFLICT_APPLICATION: ApplicationData = {
+  ...DOMESTIC_MALT_APPLICATION,
+  brandName: 'SMALL SIGNAL',
+  classType: 'MALT BEVERAGE',
+  alcoholContent: '2.6% Alc. by Vol.',
+  labelAlcoholStatementPresent: true,
+  maltAlcoholCharacterizationClaim: true,
+  productionFacts: 'Laboratory result: 2.6 percent alcohol by volume.',
+}
+
+const GEOGRAPHIC_MALT_APPLICATION: ApplicationData = {
+  ...DOMESTIC_MALT_APPLICATION,
+  brandName: 'COMPASS HOUSE',
+  classType: 'BELGIAN STYLE ALE',
+  alcoholContent: '5.8% Alc. by Vol.',
+  maltGeographicClaim: true,
+  productionFacts: 'Brewed and canned in Fort Collins, Colorado, United States.',
+}
+
+const POST_IMPORT_MALT_APPLICATION: ApplicationData = {
+  ...IMPORTED_MALT_APPLICATION,
+  brandName: 'SIERRA CROSSING',
+  classType: 'LAGER',
+  alcoholContent: '4.5% Alc. by Vol.',
+  labelAlcoholStatementPresent: true,
+  netContents: '12 FL OZ (355 mL)',
+  containerVolumeMl: 355,
+  applicantName: 'BORDERLAND BEVERAGE COMPANY',
+  applicantAddress: 'SAN DIEGO, CALIFORNIA',
+  permitName: 'BORDERLAND BEVERAGE COMPANY',
+  permitAddress: 'SAN DIEGO, CALIFORNIA',
+  importCountryOfOrigin: 'MEXICO',
+  importBottlingDisposition: 'Canned in the United States after importation without blending or further production',
+  maltPostImportBottling: true,
+  productionFacts: 'Imported from Mexico in bulk and canned in San Diego without blending or other production activity.',
+}
+
 export const SAMPLE_LABELS: SampleLabel[] = [
   {
     id: 'valid',
@@ -534,6 +673,84 @@ export const SAMPLE_LABELS: SampleLabel[] = [
     name: 'Wine with glare and low contrast',
     description: 'The supported domestic varietal wine photographed with glare across conditional evidence.',
     application: DOMESTIC_WINE_APPLICATION,
+  },
+  {
+    id: 'malt-domestic-lager',
+    name: 'Domestic lager — roundel can',
+    description: 'A bold circular can design with required domestic identity, quantity, and brewer information.',
+    application: DOMESTIC_MALT_APPLICATION,
+  },
+  {
+    id: 'malt-imported-pilsner',
+    name: 'Imported pilsner — heritage bottle',
+    description: 'A narrow European-inspired bottle label with matching importer, German origin, and optional alcohol statement.',
+    application: IMPORTED_MALT_APPLICATION,
+  },
+  {
+    id: 'malt-imported-origin-conflict',
+    name: 'Imported malt origin conflict',
+    description: 'The packet says Germany while the readable heritage artwork says Product of Austria.',
+    application: IMPORTED_MALT_APPLICATION,
+  },
+  {
+    id: 'malt-specialty-complete',
+    name: 'Flavored malt specialty — complete',
+    description: 'A neon fruit-forward specialty can with complete formula, alcohol, color, sulfite, and aspartame disclosures.',
+    application: SPECIALTY_MALT_APPLICATION,
+  },
+  {
+    id: 'malt-specialty-missing',
+    name: 'Flavored malt specialty — missing disclosures',
+    description: 'The specialty packet requires composition and additive statements that are absent from the artwork.',
+    application: SPECIALTY_MALT_APPLICATION,
+  },
+  {
+    id: 'malt-specialty-conflict',
+    name: 'Flavored malt composition conflict',
+    description: 'The approved natural-tangerine composition conflicts with an artificial-tangerine statement.',
+    application: SPECIALTY_MALT_APPLICATION,
+  },
+  {
+    id: 'malt-non-alcoholic',
+    name: 'Non-alcoholic malt beverage',
+    description: 'A spacious minimalist label with the required adjacent below-0.5-percent statement.',
+    application: NON_ALCOHOLIC_MALT_APPLICATION,
+  },
+  {
+    id: 'malt-low-alcohol-conflict',
+    name: 'Low-alcohol threshold conflict',
+    description: 'A retro typographic label says Low Alcohol while analysis establishes 2.6 percent alcohol.',
+    application: LOW_ALCOHOL_CONFLICT_APPLICATION,
+  },
+  {
+    id: 'malt-geographic-qualified',
+    name: 'Qualified Belgian-style ale',
+    description: 'A blueprint-inspired U.S. ale label correctly qualifies its geographically significant style.',
+    application: GEOGRAPHIC_MALT_APPLICATION,
+  },
+  {
+    id: 'malt-geographic-conflict',
+    name: 'Unqualified geographic designation',
+    description: 'A Colorado-produced label says Belgian Ale without Style, Type, or equivalent qualification.',
+    application: GEOGRAPHIC_MALT_APPLICATION,
+  },
+  {
+    id: 'malt-post-import-complete',
+    name: 'Imported and canned in the United States',
+    description: 'An industrial can label correctly identifies Mexican origin and post-import U.S. canning.',
+    application: POST_IMPORT_MALT_APPLICATION,
+  },
+  {
+    id: 'malt-glare-photo',
+    name: 'Lager can with diagonal glare',
+    description: 'The roundel can artwork photographed through bright diagonal glare.',
+    application: DOMESTIC_MALT_APPLICATION,
+  },
+  {
+    id: 'malt-photo-perspective',
+    name: 'Lager can at a tabletop angle',
+    description: 'The circular can design photographed off-axis against a dark taproom surface.',
+    application: DOMESTIC_MALT_APPLICATION,
   },
 ]
 
@@ -784,11 +1001,131 @@ function wineLabel(variant: SampleVariant) {
   </svg>`
 }
 
+function maltRoundelLabel() {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="1900" viewBox="0 0 1500 1900">
+    <rect width="1500" height="1900" fill="#f3c84b"/>
+    <path d="M0 0h340L1500 1370v530h-360L0 730Z" fill="#163b57"/>
+    <path d="M0 250 1250 1500M250 0l1250 1250" stroke="#f7e7a6" stroke-width="22" opacity=".65"/>
+    <circle cx="750" cy="610" r="390" fill="#f5eee0" stroke="#c64b31" stroke-width="30"/>
+    <circle cx="750" cy="610" r="315" fill="none" stroke="#163b57" stroke-width="7"/>
+    <text x="750" y="490" text-anchor="middle" font-family="Arial, sans-serif" font-size="72" font-weight="800" letter-spacing="5" fill="#163b57">HIGHLINE</text>
+    <text x="750" y="580" text-anchor="middle" font-family="Arial, sans-serif" font-size="58" font-weight="700" letter-spacing="9" fill="#c64b31">BREWING</text>
+    <path d="M540 650h420" stroke="#163b57" stroke-width="8"/>
+    <text x="750" y="770" text-anchor="middle" font-family="Georgia, serif" font-size="116" font-weight="700" fill="#163b57">LAGER</text>
+    <text x="110" y="1115" font-family="Arial, sans-serif" font-size="46" font-weight="800" fill="#fff">12 FL OZ</text>
+    <text x="110" y="1210" font-family="Arial, sans-serif" font-size="31" fill="#fff">BREWED AND CANNED BY HIGHLINE BREWING COMPANY</text>
+    <text x="110" y="1258" font-family="Arial, sans-serif" font-size="31" fill="#fff">DENVER, COLORADO</text>
+    <rect x="80" y="1360" width="1340" height="370" rx="24" fill="#fffdf5" stroke="#163b57" stroke-width="5"/>
+    ${warningMarkup('valid', { x: 110, y: 1445, size: 27, lineHeight: 50 })}
+  </svg>`
+}
+
+function maltImportedLabel(variant: SampleVariant) {
+  const origin = variant === 'malt-imported-origin-conflict' ? 'PRODUCT OF AUSTRIA' : 'PRODUCT OF GERMANY'
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1150" height="2000" viewBox="0 0 1150 2000">
+    <rect width="1150" height="2000" fill="#eee3c8"/>
+    <rect x="38" y="38" width="1074" height="1924" fill="none" stroke="#153d2f" stroke-width="12"/>
+    <rect x="70" y="70" width="1010" height="1860" fill="none" stroke="#b38b3f" stroke-width="4"/>
+    <path d="M575 120 760 270 700 495H450L390 270Z" fill="#153d2f"/>
+    <path d="m575 180 42 85 94 14-68 66 16 94-84-44-84 44 16-94-68-66 94-14Z" fill="#d5ad52"/>
+    <text x="575" y="645" text-anchor="middle" font-family="Georgia, serif" font-size="102" font-weight="700" letter-spacing="4" fill="#153d2f">KRONENFELD</text>
+    <text x="575" y="745" text-anchor="middle" font-family="Arial, sans-serif" font-size="48" letter-spacing="12" fill="#8c2f2a">PILSNER BEER</text>
+    <path d="M180 810h790" stroke="#b38b3f" stroke-width="5"/>
+    <text x="575" y="920" text-anchor="middle" font-family="Arial, sans-serif" font-size="39">4.8% ALC. BY VOL.</text>
+    <text x="575" y="990" text-anchor="middle" font-family="Arial, sans-serif" font-size="35">11.2 FL OZ (330 mL)</text>
+    <text x="575" y="1090" text-anchor="middle" font-family="Arial, sans-serif" font-size="38" font-weight="700">${origin}</text>
+    <text x="575" y="1170" text-anchor="middle" font-family="Arial, sans-serif" font-size="27">IMPORTED BY NORTH ATLANTIC BEVERAGE IMPORTS</text>
+    <text x="575" y="1215" text-anchor="middle" font-family="Arial, sans-serif" font-size="27">BOSTON, MASSACHUSETTS</text>
+    <rect x="75" y="1320" width="1000" height="430" rx="8" fill="#fffdf7" stroke="#153d2f" stroke-width="4"/>
+    ${warningMarkup('valid', { x: 100, y: 1410, size: 23, lineHeight: 56 })}
+  </svg>`
+}
+
+function maltSpecialtyLabel(variant: SampleVariant) {
+  const missing = variant === 'malt-specialty-missing'
+  const composition = variant === 'malt-specialty-conflict'
+    ? 'MALT BEVERAGE WITH ARTIFICIAL TANGERINE FLAVOR AND ARTIFICIAL COLOR'
+    : 'MALT BEVERAGE WITH NATURAL TANGERINE FLAVOR AND ARTIFICIAL COLOR'
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1750" height="1750" viewBox="0 0 1750 1750">
+    <defs><linearGradient id="hot" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ff4d6d"/><stop offset=".5" stop-color="#ffb703"/><stop offset="1" stop-color="#39d9c8"/></linearGradient></defs>
+    <rect width="1750" height="1750" fill="#21123a"/>
+    <path d="M-120 260 1800-90v360L-120 620Zm0 610 1920-350v250L-120 1120Z" fill="url(#hot)"/>
+    <circle cx="1340" cy="465" r="235" fill="#ffec55"/><circle cx="1340" cy="465" r="165" fill="#ff7a00"/>
+    <text x="105" y="230" font-family="Arial, sans-serif" font-size="96" font-weight="900" fill="#fff">CITRUS</text>
+    <text x="105" y="330" font-family="Arial, sans-serif" font-size="96" font-weight="900" fill="#fff">STATIC</text>
+    <text x="110" y="735" font-family="Arial, sans-serif" font-size="150" font-weight="900" font-style="italic" fill="#fff">POP ORBIT</text>
+    ${missing ? '' : `<text x="110" y="875" font-family="Arial, sans-serif" font-size="31" font-weight="700" fill="#fff">${composition}</text>
+    <text x="110" y="935" font-family="Arial, sans-serif" font-size="29" fill="#fff">6.0% ALC. BY VOL. · 12 FL OZ</text>
+    <text x="110" y="995" font-family="Arial, sans-serif" font-size="27" fill="#fff">CONTAINS FD&amp;C YELLOW NO. 5 · CONTAINS SULFITES · CONTAINS CARMINE</text>
+    <text x="110" y="1050" font-family="Arial, sans-serif" font-size="26" font-weight="700" fill="#fff">PHENYLKETONURICS: CONTAINS PHENYLALANINE</text>`}
+    <text x="110" y="1145" font-family="Arial, sans-serif" font-size="27" fill="#fff">BREWED AND CANNED BY CITRUS STATIC BREW LAB, AUSTIN, TEXAS</text>
+    <rect x="85" y="1210" width="1580" height="430" rx="34" fill="#fff" opacity=".96"/>
+    ${warningMarkup('valid', { x: 115, y: 1300, size: 27, lineHeight: 55 })}
+  </svg>`
+}
+
+function maltClaimLabel(variant: SampleVariant) {
+  const nonAlcoholic = variant === 'malt-non-alcoholic'
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="1900" viewBox="0 0 1500 1900">
+    <rect width="1500" height="1900" fill="${nonAlcoholic ? '#f8faf7' : '#f0d4bf'}"/>
+    <path d="M0 0h1500v170L0 430Z" fill="${nonAlcoholic ? '#74c7c2' : '#c44132'}"/>
+    <text x="95" y="565" font-family="Arial, sans-serif" font-size="72" font-weight="300" letter-spacing="10" fill="#24343d">${nonAlcoholic ? 'CLEAR CURRENT' : 'SMALL SIGNAL'}</text>
+    <text x="95" y="820" font-family="Arial, sans-serif" font-size="155" font-weight="900" fill="#24343d">${nonAlcoholic ? 'NON-ALCOHOLIC' : 'LOW ALCOHOL'}</text>
+    <text x="100" y="930" font-family="Arial, sans-serif" font-size="43" fill="#24343d">MALT BEVERAGE</text>
+    <text x="100" y="1010" font-family="Arial, sans-serif" font-size="36" fill="#24343d">${nonAlcoholic ? 'CONTAINS LESS THAN 0.5 PERCENT ALCOHOL BY VOLUME' : '2.6% ALC. BY VOL.'}</text>
+    <text x="100" y="1090" font-family="Arial, sans-serif" font-size="36" fill="#24343d">12 FL OZ</text>
+    <text x="100" y="1170" font-family="Arial, sans-serif" font-size="27" fill="#24343d">BREWED AND CANNED BY HIGHLINE BREWING COMPANY, DENVER, COLORADO</text>
+    ${nonAlcoholic ? '' : `<rect x="75" y="1290" width="1350" height="430" rx="6" fill="#fff" stroke="#24343d" stroke-width="4"/>${warningMarkup('valid', { x: 105, y: 1380, size: 27, lineHeight: 55 })}`}
+  </svg>`
+}
+
+function maltGeographicLabel(variant: SampleVariant) {
+  const designation = variant === 'malt-geographic-conflict' ? 'BELGIAN ALE' : 'BELGIAN STYLE ALE'
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1700" height="1700" viewBox="0 0 1700 1700">
+    <rect width="1700" height="1700" fill="#173b64"/>
+    <g stroke="#8eb5d4" opacity=".3"><path d="M0 170h1700M0 340h1700M0 510h1700M0 680h1700M0 850h1700M0 1020h1700M0 1190h1700M0 1360h1700M170 0v1700M340 0v1700M510 0v1700M680 0v1700M850 0v1700M1020 0v1700M1190 0v1700M1360 0v1700M1530 0v1700"/></g>
+    <path d="M180 230h1340v650H180Z" fill="none" stroke="#f2d06b" stroke-width="10"/>
+    <path d="M265 315 480 530 265 745M1435 315l-215 215 215 215" fill="none" stroke="#f2d06b" stroke-width="10"/>
+    <text x="850" y="475" text-anchor="middle" font-family="Arial, sans-serif" font-size="94" font-weight="800" fill="#fff">COMPASS HOUSE</text>
+    <text x="850" y="640" text-anchor="middle" font-family="Arial, sans-serif" font-size="90" font-weight="300" letter-spacing="8" fill="#f2d06b">${designation}</text>
+    <text x="850" y="760" text-anchor="middle" font-family="Arial, sans-serif" font-size="36" fill="#fff">12 FL OZ · BREWED IN FORT COLLINS, COLORADO</text>
+    <text x="850" y="840" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" fill="#fff">BREWED AND CANNED BY HIGHLINE BREWING COMPANY, DENVER, COLORADO</text>
+    <rect x="105" y="1010" width="1490" height="450" fill="#f7f4e8" stroke="#f2d06b" stroke-width="6"/>
+    ${warningMarkup('valid', { x: 135, y: 1105, size: 27, lineHeight: 57 })}
+  </svg>`
+}
+
+function maltPostImportLabel() {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1500" viewBox="0 0 1800 1500">
+    <rect width="1800" height="1500" fill="#d6d0c5"/>
+    <path d="M0 0h640L280 1500H0Zm1800 0h-420l-260 1500h680Z" fill="#20262b"/>
+    <path d="M80 120h1640v1260H80Z" fill="none" stroke="#e05b35" stroke-width="18"/>
+    <text x="900" y="280" text-anchor="middle" font-family="Arial, sans-serif" font-size="102" font-weight="900" letter-spacing="5" fill="#20262b">SIERRA CROSSING</text>
+    <text x="900" y="430" text-anchor="middle" font-family="Arial, sans-serif" font-size="88" font-weight="800" fill="#e05b35">LAGER</text>
+    <text x="900" y="540" text-anchor="middle" font-family="Arial, sans-serif" font-size="41" font-weight="700">4.5% ALC. BY VOL. · 12 FL OZ (355 mL)</text>
+    <text x="900" y="635" text-anchor="middle" font-family="Arial, sans-serif" font-size="41" font-weight="800">PRODUCT OF MEXICO</text>
+    <text x="900" y="725" text-anchor="middle" font-family="Arial, sans-serif" font-size="30">IMPORTED AND CANNED IN THE UNITED STATES BY</text>
+    <text x="900" y="775" text-anchor="middle" font-family="Arial, sans-serif" font-size="30">BORDERLAND BEVERAGE COMPANY, SAN DIEGO, CALIFORNIA</text>
+    <rect x="235" y="870" width="1330" height="410" fill="#fff" stroke="#20262b" stroke-width="5"/>
+    ${warningMarkup('valid', { x: 265, y: 960, size: 26, lineHeight: 53 })}
+  </svg>`
+}
+
+function maltLabel(variant: SampleVariant) {
+  if (variant === 'malt-imported-pilsner' || variant === 'malt-imported-origin-conflict') return maltImportedLabel(variant)
+  if (variant === 'malt-specialty-complete' || variant === 'malt-specialty-missing' || variant === 'malt-specialty-conflict') return maltSpecialtyLabel(variant)
+  if (variant === 'malt-non-alcoholic' || variant === 'malt-low-alcohol-conflict') return maltClaimLabel(variant)
+  if (variant === 'malt-geographic-qualified' || variant === 'malt-geographic-conflict') return maltGeographicLabel(variant)
+  if (variant === 'malt-post-import-complete') return maltPostImportLabel()
+  return maltRoundelLabel()
+}
+
 function sampleSvg(variant: SampleVariant) {
   if (variant === 'angled-photo') return emberLabel()
   if (variant === 'glare-photo') return harborLabel()
   if (variant === 'dark-label') return orchardLabel()
   if (['production-disclosures', 'significant-solids', 'exemption-distinctive'].includes(variant)) return additionalConditionalLabel(variant)
+  if (variant.startsWith('malt-')) return maltLabel(variant)
   if (variant.startsWith('wine-')) return wineLabel(variant)
   if (['imported-clear', 'imported-origin-mismatch', 'imported-age-understatement', 'imported-age-overstatement', 'conditional-disclosures', 'conditional-missing', 'formula-composition-conflict', 'blur-photo', 'partial-obstruction', 'missing-context', 'routing-override'].includes(variant)) return expandedRuleLabel(variant)
   return classicLabel(variant)
@@ -812,17 +1149,17 @@ export async function createSampleFile(variant: SampleVariant) {
   const context = canvas.getContext('2d')
   if (!context) throw new Error('This browser could not create the sample image.')
 
-  if (variant === 'angled-photo') {
+  if (variant === 'angled-photo' || variant === 'malt-photo-perspective') {
     canvas.width = 1900
     canvas.height = 1450
     const wood = context.createLinearGradient(0, 0, canvas.width, canvas.height)
-    wood.addColorStop(0, '#b88f68')
-    wood.addColorStop(1, '#76523a')
+    wood.addColorStop(0, variant === 'malt-photo-perspective' ? '#4b4c4f' : '#b88f68')
+    wood.addColorStop(1, variant === 'malt-photo-perspective' ? '#191b1d' : '#76523a')
     context.fillStyle = wood
     context.fillRect(0, 0, canvas.width, canvas.height)
     context.save()
     context.translate(950, 725)
-    context.rotate((-4.5 * Math.PI) / 180)
+    context.rotate(((variant === 'malt-photo-perspective' ? 5.5 : -4.5) * Math.PI) / 180)
     context.shadowColor = 'rgba(0, 0, 0, 0.5)'
     context.shadowBlur = 35
     context.shadowOffsetY = 24
@@ -838,7 +1175,7 @@ export async function createSampleFile(variant: SampleVariant) {
     if (variant === 'blur-photo') context.filter = 'blur(2.4px) contrast(0.88)'
     context.drawImage(image, 0, 0)
     context.filter = 'none'
-    if (variant === 'glare-photo' || variant === 'wine-glare-photo') {
+    if (variant === 'glare-photo' || variant === 'wine-glare-photo' || variant === 'malt-glare-photo') {
       const glare = context.createLinearGradient(250, 0, 950, 1300)
       glare.addColorStop(0, 'rgba(255,255,255,0)')
       glare.addColorStop(0.42, 'rgba(255,255,255,0.08)')

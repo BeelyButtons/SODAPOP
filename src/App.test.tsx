@@ -39,7 +39,7 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: /Incorrect automatic rule set/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Production disclosures — complete/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Intrastate exemption and bottle evidence/i })).toBeInTheDocument()
-    expect(screen.getByLabelText(/34 labels remaining/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/47 labels remaining/i)).toBeInTheDocument()
   })
 
   it('renders a stable full rule-set reference route', () => {

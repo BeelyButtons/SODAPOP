@@ -4,6 +4,7 @@ import {
   collapseWhitespace,
   findAlcohol,
   findVolume,
+  normalizeWords,
   parseAlcohol,
   parseVolume,
   similarity,
@@ -131,6 +132,7 @@ function flattenWords(
   imageHeight: number,
   rotatedWidth: number,
   rotatedHeight: number,
+  passId = '0',
 ): OcrWord[] {
   if (!Array.isArray(blocks)) return []
 
@@ -148,7 +150,7 @@ function flattenWords(
             rotatedWidth,
             rotatedHeight,
           ),
-          lineId: `${blockIndex}-${paragraphIndex}-${lineIndex}`,
+          lineId: `${passId}-${blockIndex}-${paragraphIndex}-${lineIndex}`,
           fontName: word.font_name,
         })),
       ),
@@ -270,24 +272,121 @@ async function preprocessImage(file: File) {
   return { standard: canvas, enhanced: () => adaptiveThreshold(canvas) }
 }
 
-function recognitionScore(text: string, application: ApplicationData) {
-  const brandScore = similarity(application.brandName, bestObservedLine(application.brandName, text))
-  const classScore = similarity(application.classType, bestObservedLine(application.classType, text))
-  const expectedAlcohol = parseAlcohol(application.alcoholContent)
-  const observedAlcohol = parseAlcohol(findAlcohol(text))
-  const alcoholScore =
-    expectedAlcohol.abv !== null && observedAlcohol.abv === expectedAlcohol.abv &&
-    (expectedAlcohol.proof === null || observedAlcohol.proof === expectedAlcohol.proof)
-      ? 1
-      : 0
-  const volumeScore = parseVolume(findVolume(text)) === parseVolume(application.netContents) ? 1 : 0
-  const collapsed = collapseWhitespace(text)
-  const warningStart = collapsed.toLowerCase().indexOf('government warning')
-  const warningCandidate = warningStart >= 0
-    ? collapsed.slice(warningStart, warningStart + GOVERNMENT_WARNING.length + 30)
-    : ''
-  const warningScore = warningCandidate ? similarity(GOVERNMENT_WARNING, warningCandidate) : 0
-  return brandScore + classScore + alcoholScore + volumeScore + warningScore
+type EvidenceExpectation = {
+  id: string
+  weight: number
+  matched: boolean
+}
+
+export type RecognitionEvidence = {
+  coverage: number
+  matchedWeight: number
+  totalWeight: number
+  missingIds: string[]
+}
+
+function phraseDetected(expected: string | undefined, text: string, minimumSimilarity = 0.76) {
+  if (!expected?.trim()) return false
+  const normalizedExpected = collapseWhitespace(expected).toLowerCase()
+  const normalizedText = collapseWhitespace(text).toLowerCase()
+  return normalizedText.includes(normalizedExpected)
+    || similarity(expected, bestObservedLine(expected, text)) >= minimumSimilarity
+}
+
+function warningExpected(application: ApplicationData) {
+  const abv = parseAlcohol(application.alcoholContent).abv
+  return abv !== null && abv >= 0.5
+}
+
+function numericalAlcoholExpected(application: ApplicationData) {
+  const abv = parseAlcohol(application.alcoholContent).abv
+  if (application.productType === 'distilled_spirits') return true
+  if (application.productType === 'malt_beverage') {
+    return application.maltAlcoholFromAddedIngredients === true
+      || application.labelAlcoholStatementPresent === true
+  }
+  return abv !== null && (abv < 7 || abv > 14 || application.labelAlcoholStatementPresent === true)
+}
+
+function volumeEvidenceDetected(text: string, application: ApplicationData) {
+  const observed = parseVolume(findVolume(text))
+  const expected = parseVolume(application.netContents)
+  if (observed === null || expected === null) return false
+  return Math.abs(observed - expected) <= Math.max(1.5, expected * 0.005)
+}
+
+function alcoholEvidenceDetected(text: string, application: ApplicationData) {
+  if (findAlcohol(text)) return true
+  if (application.maltAlcoholCharacterizationClaim) {
+    return /\b(?:low alcohol|reduced alcohol|non[- ]alcoholic|alcohol free)\b/i.test(text)
+  }
+  return false
+}
+
+function recognitionExpectations(text: string, application: ApplicationData): EvidenceExpectation[] {
+  const expectations: EvidenceExpectation[] = [
+    { id: 'brand', weight: 1, matched: phraseDetected(application.brandName, text) },
+    { id: 'class-type', weight: 1, matched: phraseDetected(application.classType, text) },
+    {
+      id: 'net-contents',
+      weight: 0.9,
+      matched: volumeEvidenceDetected(text, application),
+    },
+  ]
+
+  if (warningExpected(application)) {
+    const collapsed = collapseWhitespace(text)
+    const warningStart = collapsed.toLowerCase().indexOf('government warning')
+    const warningCandidate = warningStart >= 0
+      ? collapsed.slice(warningStart, warningStart + GOVERNMENT_WARNING.length + 30)
+      : ''
+    expectations.push({
+      id: 'government-warning',
+      weight: 1.25,
+      matched: Boolean(warningCandidate && similarity(GOVERNMENT_WARNING, warningCandidate) >= 0.68),
+    })
+  }
+
+  if (numericalAlcoholExpected(application)) {
+    expectations.push({ id: 'alcohol-content', weight: 0.9, matched: alcoholEvidenceDetected(text, application) })
+  }
+
+  const responsibleName = application.permitName || application.applicantName
+  if (responsibleName) expectations.push({ id: 'responsible-party', weight: 0.75, matched: phraseDetected(responsibleName, text, 0.72) })
+  if (application.source === 'imported' && application.importCountryOfOrigin) {
+    expectations.push({ id: 'country-of-origin', weight: 0.75, matched: phraseDetected(application.importCountryOfOrigin, text, 0.72) })
+  }
+  if (application.fancifulName) expectations.push({ id: 'fanciful-name', weight: 0.55, matched: phraseDetected(application.fancifulName, text) })
+  if (application.formulaCompositionStatement) {
+    expectations.push({ id: 'formula-composition', weight: 0.9, matched: phraseDetected(application.formulaCompositionStatement, text, 0.7) })
+  }
+  for (const [index, instruction] of (application.formulaLabelingInstructions?.split('|') ?? []).entries()) {
+    if (!instruction.trim() || instruction === application.formulaCompositionStatement) continue
+    expectations.push({ id: `formula-instruction-${index + 1}`, weight: 0.35, matched: phraseDetected(instruction, text, 0.72) })
+  }
+  if (application.maltAlcoholCharacterizationClaim) {
+    expectations.push({
+      id: 'alcohol-characterization-claim',
+      weight: 0.65,
+      matched: /\b(?:low alcohol|reduced alcohol|non[- ]alcoholic|alcohol free)\b/i.test(text),
+    })
+  }
+  if (application.wineAppellation) expectations.push({ id: 'wine-appellation', weight: 0.45, matched: phraseDetected(application.wineAppellation, text) })
+  if (application.wineVintage) expectations.push({ id: 'wine-vintage', weight: 0.35, matched: phraseDetected(application.wineVintage, text) })
+
+  return expectations
+}
+
+export function recognitionEvidence(text: string, application: ApplicationData): RecognitionEvidence {
+  const expectations = recognitionExpectations(text, application)
+  const totalWeight = expectations.reduce((total, expectation) => total + expectation.weight, 0)
+  const matchedWeight = expectations.reduce((total, expectation) => total + (expectation.matched ? expectation.weight : 0), 0)
+  return {
+    coverage: totalWeight ? matchedWeight / totalWeight : 1,
+    matchedWeight,
+    totalWeight,
+    missingIds: expectations.filter((expectation) => !expectation.matched).map((expectation) => expectation.id),
+  }
 }
 
 type RecognitionPass = {
@@ -295,15 +394,62 @@ type RecognitionPass = {
   confidence: number
   blocks: unknown
   rotationRadians: number
-  score: number
+  evidence: RecognitionEvidence
   canvas: HTMLCanvasElement
   rotatedWidth: number
   rotatedHeight: number
+  durationMs: number
 }
 
-export function shouldRetryRecognition(score: number, confidence: number) {
-  if (score < 3.75) return true
-  return score < 4.35 && confidence < 75
+export function shouldRetryRecognition(evidence: RecognitionEvidence, confidence: number) {
+  if (evidence.coverage >= 0.88) return false
+  if (evidence.coverage >= 0.72 && confidence >= 60) return false
+  if (evidence.missingIds.length <= 1 && confidence >= 78) return false
+  return true
+}
+
+export function shouldTryOrientationRecovery(evidence: RecognitionEvidence, confidence: number, text: string) {
+  return evidence.coverage < 0.3 && confidence < 55 && collapseWhitespace(text).length < 80
+}
+
+export function mergeRecognitionText(texts: string[]) {
+  const merged: string[] = []
+  for (const text of texts) {
+    for (const line of text.split(/\r?\n/).map((value) => value.trim()).filter(Boolean)) {
+      const duplicate = merged.some((existing) => {
+        const normalizedExisting = collapseWhitespace(existing).toLowerCase()
+        const normalizedLine = collapseWhitespace(line).toLowerCase()
+        return normalizedExisting === normalizedLine || similarity(existing, line) >= 0.94
+      })
+      if (!duplicate) merged.push(line)
+    }
+  }
+  return merged.join('\n')
+}
+
+function boxIntersectionRatio(left: OcrBox, right: OcrBox) {
+  const x0 = Math.max(left.x0, right.x0)
+  const y0 = Math.max(left.y0, right.y0)
+  const x1 = Math.min(left.x1, right.x1)
+  const y1 = Math.min(left.y1, right.y1)
+  if (x1 <= x0 || y1 <= y0) return 0
+  const intersection = (x1 - x0) * (y1 - y0)
+  const leftArea = Math.max(1, (left.x1 - left.x0) * (left.y1 - left.y0))
+  const rightArea = Math.max(1, (right.x1 - right.x0) * (right.y1 - right.y0))
+  return intersection / Math.min(leftArea, rightArea)
+}
+
+export function mergeRecognitionWords(wordSets: OcrWord[][]) {
+  const merged: OcrWord[] = []
+  for (const word of wordSets.flat()) {
+    const duplicateIndex = merged.findIndex((existing) =>
+      normalizeWords(existing.text) === normalizeWords(word.text)
+      && boxIntersectionRatio(existing.bbox, word.bbox) >= 0.55,
+    )
+    if (duplicateIndex < 0) merged.push(word)
+    else if (word.confidence > merged[duplicateIndex].confidence) merged[duplicateIndex] = word
+  }
+  return merged
 }
 
 async function imageDimensions(source: string | null, fallback: HTMLCanvasElement) {
@@ -318,11 +464,17 @@ async function runPass(
   worker: Awaited<ReturnType<typeof getWorker>>,
   canvas: HTMLCanvasElement,
   application: ApplicationData,
-  options: { rotateAuto?: boolean; rotateRadians?: number },
+  options: { rotateAuto?: boolean; rotateRadians?: number; pageSegMode?: PSM },
 ): Promise<RecognitionPass> {
+  const passStartedAt = performance.now()
+  const { pageSegMode = PSM.SPARSE_TEXT, ...recognizeOptions } = options
+  await worker.setParameters({
+    tessedit_pageseg_mode: pageSegMode,
+    preserve_interword_spaces: '1',
+  })
   const result = await worker.recognize(
     canvas,
-    options,
+    recognizeOptions,
     { text: true, blocks: true, imageColor: true },
   )
   const rotated = await imageDimensions(result.data.imageColor, canvas)
@@ -330,13 +482,19 @@ async function runPass(
     text: result.data.text,
     confidence: result.data.confidence,
     blocks: result.data.blocks,
-    rotationRadians: result.data.rotateRadians ?? options.rotateRadians ?? 0,
-    score: recognitionScore(result.data.text, application),
+    rotationRadians: result.data.rotateRadians ?? recognizeOptions.rotateRadians ?? 0,
+    evidence: recognitionEvidence(result.data.text, application),
     canvas,
     rotatedWidth: rotated.width,
     rotatedHeight: rotated.height,
+    durationMs: performance.now() - passStartedAt,
   }
 }
+
+const OCR_RESULT_BUDGET_MS = 4_800
+const SECOND_PASS_START_CUTOFF_MS = 3_100
+const BUDGET_TIMEOUT_MESSAGE = 'OCR recovery pass exceeded the result budget.'
+export const MAX_RECOGNITION_PASSES = 2
 
 export async function recognizeLabel(
   file: File,
@@ -355,54 +513,73 @@ export async function recognizeLabel(
     )
     const prepared = await preprocessImage(file)
     const passes: RecognitionPass[] = []
+    let attemptsStarted = 1
+    let retryReason: string | undefined
     passes.push(await runPass(worker, prepared.standard, application, { rotateAuto: true }))
 
-    const attemptedOrientations = new Set<number>()
-    if (passes[0].score < 1.5) {
-      onProgress({ progress: 35, message: 'Checking upside-down orientation' })
-      passes.push(await runPass(worker, prepared.standard, application, { rotateRadians: Math.PI }))
-      attemptedOrientations.add(Math.PI)
-    }
-
-    const leadingPass = passes.reduce((winner, candidate) => candidate.score > winner.score ? candidate : winner)
-    if (shouldRetryRecognition(leadingPass.score, leadingPass.confidence)) {
-      onProgress({ progress: 30, message: 'Improving difficult text' })
-      const enhanced = prepared.enhanced()
-      passes.push(await runPass(worker, enhanced, application, { rotateAuto: true }))
-      const orientations = [Math.PI, Math.PI / 2, -Math.PI / 2]
-      for (const rotation of orientations) {
-        if (attemptedOrientations.has(rotation)) continue
-        if (Math.max(...passes.map((pass) => pass.score)) >= 4.35) break
-        onProgress({ progress: 55, message: 'Checking label orientation' })
-        passes.push(await runPass(worker, enhanced, application, { rotateRadians: rotation }))
+    const firstPass = passes[0]
+    const elapsedAfterFirstPass = performance.now() - startedAt
+    if (
+      shouldRetryRecognition(firstPass.evidence, firstPass.confidence)
+      && elapsedAfterFirstPass < SECOND_PASS_START_CUTOFF_MS
+    ) {
+      const orientationRecovery = shouldTryOrientationRecovery(firstPass.evidence, firstPass.confidence, firstPass.text)
+      retryReason = orientationRecovery
+        ? 'Very limited upright evidence suggested an upside-down image.'
+        : `Required evidence remained unresolved: ${firstPass.evidence.missingIds.join(', ')}.`
+      onProgress({ progress: 55, message: orientationRecovery ? 'Checking image orientation' : 'Recovering difficult text' })
+      const remainingBudget = Math.max(250, OCR_RESULT_BUDGET_MS - (performance.now() - startedAt))
+      attemptsStarted = Math.min(attemptsStarted + 1, MAX_RECOGNITION_PASSES)
+      try {
+        const recoveryCanvas = orientationRecovery ? prepared.standard : prepared.enhanced()
+        const recoveryOptions = orientationRecovery
+          ? { rotateRadians: Math.PI, pageSegMode: PSM.SPARSE_TEXT }
+          : { rotateAuto: true, pageSegMode: PSM.AUTO }
+        passes.push(await withTimeout(
+          runPass(worker, recoveryCanvas, application, recoveryOptions),
+          remainingBudget,
+          BUDGET_TIMEOUT_MESSAGE,
+        ))
+      } catch (error) {
+        if (!(error instanceof Error) || error.message !== BUDGET_TIMEOUT_MESSAGE) throw error
+        retryReason += ' The recovery pass reached the time budget, so SODAPOP returned the first-pass evidence.'
+        void discardWorker()
       }
+    } else if (shouldRetryRecognition(firstPass.evidence, firstPass.confidence)) {
+      retryReason = 'The first pass used the recovery budget, so SODAPOP returned its best available evidence without another full scan.'
     }
 
     const best = passes.reduce((winner, candidate) =>
-      candidate.score + candidate.confidence / 1000 > winner.score + winner.confidence / 1000
+      candidate.evidence.coverage + candidate.confidence / 1000 > winner.evidence.coverage + winner.confidence / 1000
         ? candidate
         : winner,
     )
-    const words = flattenWords(
-      best.blocks,
-      best.rotationRadians,
-      best.canvas.width,
-      best.canvas.height,
-      best.rotatedWidth,
-      best.rotatedHeight,
-    ).map((word) => ({
-      ...word,
-      inkRatio: measureInkRatio(best.canvas, word.bbox),
-    }))
+    const orderedPasses = [best, ...passes.filter((pass) => pass !== best)]
+    const words = mergeRecognitionWords(orderedPasses.map((pass, passIndex) =>
+      flattenWords(
+        pass.blocks,
+        pass.rotationRadians,
+        prepared.standard.width,
+        prepared.standard.height,
+        pass.rotatedWidth,
+        pass.rotatedHeight,
+        String(passIndex),
+      ).map((word) => ({
+        ...word,
+        inkRatio: measureInkRatio(prepared.standard, word.bbox),
+      })),
+    ))
     return {
-      text: best.text,
+      text: mergeRecognitionText(orderedPasses.map((pass) => pass.text)),
       confidence: best.confidence,
       durationMs: performance.now() - startedAt,
       words,
-      imageWidth: best.canvas.width,
-      imageHeight: best.canvas.height,
+      imageWidth: prepared.standard.width,
+      imageHeight: prepared.standard.height,
       rotationRadians: best.rotationRadians,
-      attempts: passes.length,
+      attempts: attemptsStarted,
+      passTimingsMs: passes.map((pass) => pass.durationMs),
+      retryReason,
     }
   } catch (error) {
     await discardWorker()

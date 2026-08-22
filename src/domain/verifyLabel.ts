@@ -24,6 +24,7 @@ import {
   type RuleSetSelection,
 } from './ruleEngine'
 import { distilledSpiritsChecks } from './distilledSpiritsChecks'
+import { maltBeverageChecks } from './maltBeverageChecks'
 import { wineChecks } from './wineChecks'
 
 type VerificationInput = {
@@ -36,6 +37,8 @@ type VerificationInput = {
   imageHeight?: number
   ocrAttempts?: number
   ocrRotationDegrees?: number
+  ocrPassTimingsMs?: number[]
+  ocrRetryReason?: string
   ruleSelection?: RuleSetSelection
 }
 
@@ -444,6 +447,14 @@ export function verifyLabel(input: VerificationInput): ReviewOutcome {
       }).map(withDetectedHighlight)
     : selectedRuleSetId === 'wine-7plus-domestic' || selectedRuleSetId === 'wine-7plus-imported' || selectedRuleSetId === 'wine-under-7-ttb-routing'
       ? wineChecks({
+          application: input.application,
+          ocrText: input.ocrText,
+          ocrConfidence: input.ocrConfidence,
+          ruleSetId: selectedRuleSetId,
+          coreChecks,
+        }).map(withDetectedHighlight)
+    : selectedRuleSetId === 'malt-beverage-domestic' || selectedRuleSetId === 'malt-beverage-imported'
+      ? maltBeverageChecks({
           application: input.application,
           ocrText: input.ocrText,
           ocrConfidence: input.ocrConfidence,

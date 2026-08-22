@@ -37,6 +37,7 @@ export const applicationSchema = z.object({
   labelSet: z.boolean().optional(),
   bottleMarkings: z.string().trim().optional(),
   bottleDesignEvidence: z.string().trim().optional(),
+  labelAlcoholStatementPresent: z.boolean().optional(),
   containsSignificantSolids: z.boolean().optional(),
   containsNeutralSpirits: z.boolean().optional(),
   requiresAgeStatement: z.boolean().optional(),
@@ -62,6 +63,11 @@ export const applicationSchema = z.object({
   wineForeignLawCompliant: z.boolean().optional(),
   wineForeignBlendReferenced: z.boolean().optional(),
   wineForeignPercentage: z.number().min(0).max(100).optional(),
+  maltAlcoholFromAddedIngredients: z.boolean().optional(),
+  maltAlcoholCharacterizationClaim: z.boolean().optional(),
+  maltGeographicClaim: z.boolean().optional(),
+  maltSpecialtyProduct: z.boolean().optional(),
+  maltPostImportBottling: z.boolean().optional(),
   importCountryOfOrigin: z.string().trim().optional(),
   importBottlingDisposition: z.string().trim().optional(),
   productionFacts: z.string().trim().optional(),
@@ -154,6 +160,8 @@ export type ReviewOutcome = {
   durationMs: number
   ocrAttempts?: number
   ocrRotationDegrees?: number
+  ocrPassTimingsMs?: number[]
+  ocrRetryReason?: string
   application?: ApplicationData
   ocrWords?: OcrWord[]
   imageWidth?: number
