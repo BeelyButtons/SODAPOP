@@ -1118,6 +1118,179 @@ footer {
   gap: 14px;
 }
 
+.results-view-switch {
+  align-items: center;
+  background: #f6f3eb;
+  border: 1px solid #d9d3c4;
+  border-radius: 14px;
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+  margin: 18px 0;
+  padding: 14px 16px;
+}
+
+.results-view-switch > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.results-view-switch > div:first-child span {
+  color: #5e625f;
+  font-size: .9rem;
+}
+
+.results-view-switch > div:last-child {
+  background: #e8e4da;
+  border-radius: 10px;
+  display: flex;
+  padding: 4px;
+}
+
+.results-view-switch button {
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: #3f4843;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  padding: 9px 13px;
+}
+
+.results-view-switch button.selected {
+  background: #fff;
+  box-shadow: 0 1px 4px rgb(31 43 36 / 14%);
+  color: #183e2c;
+}
+
+.review-section-list {
+  display: grid;
+  gap: 12px;
+}
+
+.review-section-card {
+  background: #fff;
+  border: 1px solid #d7ddd8;
+  border-left: 5px solid #a8b0aa;
+  border-radius: 14px;
+  padding: 16px;
+}
+
+.review-section-card.review-section-mismatch { border-left-color: #a9473e; }
+.review-section-card.review-section-needs_review { border-left-color: #b37b1e; }
+.review-section-card.review-section-pass { border-left-color: #3b7a50; }
+.review-section-card.review-section-not_applicable { background: #f7f8f6; color: #68706b; }
+
+.review-section-heading,
+.review-section-heading > div:first-child {
+  align-items: flex-start;
+  display: flex;
+  gap: 11px;
+}
+
+.review-section-heading {
+  justify-content: space-between;
+}
+
+.review-section-heading h3,
+.review-section-heading p,
+.review-section-summary {
+  margin: 0;
+}
+
+.review-section-heading h3 { font-size: 1.05rem; }
+.review-section-heading p { color: #626a65; font-size: .88rem; margin-top: 4px; }
+.review-section-summary { font-weight: 700; margin-top: 12px; }
+
+.section-status-mark {
+  align-items: center;
+  border-radius: 50%;
+  display: inline-flex;
+  flex: 0 0 27px;
+  font-weight: 900;
+  height: 27px;
+  justify-content: center;
+}
+
+.section-status-label {
+  border-radius: 999px;
+  flex: 0 0 auto;
+  font-size: .78rem;
+  font-weight: 800;
+  padding: 5px 9px;
+}
+
+.section-status-mismatch { background: #f7dfdc; color: #842f29; }
+.section-status-needs_review { background: #f8ebc9; color: #795313; }
+.section-status-pass { background: #def0e3; color: #205f36; }
+.section-status-not_applicable { background: #e7ebe8; color: #616963; }
+
+.review-section-details {
+  border-top: 1px solid #e5e9e6;
+  margin-top: 13px;
+  padding-top: 11px;
+}
+
+.review-section-details summary {
+  color: #315a45;
+  cursor: pointer;
+  font-weight: 750;
+}
+
+.review-section-checks {
+  display: grid;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.section-check-row {
+  align-items: start;
+  background: #f8faf8;
+  border: 1px solid #dde3df;
+  border-radius: 9px;
+  color: inherit;
+  cursor: pointer;
+  display: grid;
+  font: inherit;
+  gap: 9px;
+  grid-template-columns: 20px 1fr auto;
+  padding: 10px;
+  text-align: left;
+  width: 100%;
+}
+
+.section-check-row.active,
+.section-check-row:hover,
+.section-check-row:focus-visible { border-color: #46745c; box-shadow: 0 0 0 2px rgb(70 116 92 / 14%); }
+.section-check-row small { color: #606863; display: block; line-height: 1.35; margin-top: 3px; }
+.section-check-row > span:last-child { font-size: .76rem; font-weight: 800; }
+
+.section-decision-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+.section-recorded-decision {
+  align-items: center;
+  background: #f0f3f1;
+  border-radius: 9px;
+  display: flex;
+  justify-content: space-between;
+  margin-top: 14px;
+  padding: 9px 11px;
+}
+
+@media (max-width: 760px) {
+  .results-view-switch,
+  .review-section-heading,
+  .section-decision-buttons { align-items: stretch; flex-direction: column; }
+  .results-view-switch > div:last-child { width: 100%; }
+  .results-view-switch button { flex: 1; }
+}
+
 .check-card {
   min-width: 0;
   scroll-margin-top: var(--review-command-offset, 96px);

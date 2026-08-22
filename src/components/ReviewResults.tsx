@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { RuleSetControl } from './RuleSetControl'
 import { reviewContextFromApplication, selectAutomaticRuleSet } from '../domain/ruleEngine'
+import { buildReviewSections, type ReviewSection } from '../domain/reviewSections'
 import type { ApplicationData, CheckStatus, ReviewCheck, ReviewOutcome } from '../domain/reviewSchema'
 import type { QueueDecision, SavedRotation, StaffDecisions } from '../reviewQueue'
 
@@ -177,6 +178,117 @@ function CheckCard({
   )
 }
 
+const sectionStatusLabels: Record<ReviewSection['status'], string> = {
+  mismatch: 'Potential problem',
+  needs_review: 'Needs staff review',
+  pass: 'Passed',
+  not_applicable: 'Not applicable',
+}
+
+function sectionSummary(section: ReviewSection) {
+  if (section.status === 'not_applicable') return 'No requirements in this section apply to this review.'
+  const parts = []
+  if (section.counts.mismatch) parts.push(`${section.counts.mismatch} potential ${section.counts.mismatch === 1 ? 'problem' : 'problems'}`)
+  if (section.counts.needs_review) parts.push(`${section.counts.needs_review} ${section.counts.needs_review === 1 ? 'item needs' : 'items need'} staff judgment`)
+  if (section.counts.pass) parts.push(`${section.counts.pass} ${section.counts.pass === 1 ? 'check passed' : 'checks passed'}`)
+  return parts.join(' · ')
+}
+
+function SimplifiedSection({
+  section,
+  decisions,
+  readOnly,
+  recordedDecision,
+  activeCheckId,
+  onPass,
+  onFail,
+  onPreview,
+  onSelect,
+}: {
+  section: ReviewSection
+  decisions: StaffDecisions
+  readOnly: boolean
+  recordedDecision?: QueueDecision
+  activeCheckId: ReviewCheck['id'] | null
+  onPass: (checkIds: string[]) => void
+  onFail: (checkId: string) => void
+  onPreview: (id: ReviewCheck['id'] | null) => void
+  onSelect: (id: ReviewCheck['id']) => void
+}) {
+  const failed = section.checks.some((check) => decisions[check.id] === 'fail')
+  const passed = section.checks.length > 0 && section.checks.every((check) => decisions[check.id] === 'pass')
+  const sectionDecision = failed ? 'fail' : passed ? 'pass' : undefined
+  const firstAttentionCheck = section.checks.find((check) => check.status !== 'pass') ?? section.checks[0]
+
+  return (
+    <article className={`review-section-card review-section-${section.status}`} data-review-section-id={section.id}>
+      <div className="review-section-heading">
+        <div>
+          <span className={`section-status-mark section-status-${section.status}`} aria-hidden="true">
+            {section.status === 'mismatch' ? '!' : section.status === 'needs_review' ? '?' : section.status === 'pass' ? '✓' : '—'}
+          </span>
+          <div>
+            <h3>{section.title}</h3>
+            <p>{section.description}</p>
+          </div>
+        </div>
+        <span className={`section-status-label section-status-${section.status}`}>{sectionStatusLabels[section.status]}</span>
+      </div>
+      <p className="review-section-summary">{sectionSummary(section)}</p>
+
+      {section.checks.length > 0 && (
+        <details className="review-section-details" open={section.status === 'mismatch' || section.status === 'needs_review'}>
+          <summary>View {section.checks.length} underlying {section.checks.length === 1 ? 'requirement' : 'requirements'}</summary>
+          <div className="review-section-checks">
+            {section.checks.map((check) => (
+              <button
+                className={`section-check-row section-check-${check.status}${activeCheckId === check.id ? ' active' : ''}`}
+                key={check.id}
+                type="button"
+                onClick={() => onSelect(check.id)}
+                onFocus={() => onPreview(check.id)}
+                onBlur={() => onPreview(null)}
+                onMouseEnter={() => onPreview(check.id)}
+                onMouseLeave={() => onPreview(null)}
+              >
+                <span>{check.status === 'mismatch' ? '!' : check.status === 'needs_review' ? '?' : '✓'}</span>
+                <span><strong>{check.label}</strong><small>{check.explanation}</small></span>
+                <span>{statusLabels[check.status]}</span>
+              </button>
+            ))}
+          </div>
+        </details>
+      )}
+
+      {section.status !== 'not_applicable' && (
+        readOnly ? (
+          <div className={`section-recorded-decision section-recorded-${sectionDecision ?? 'unknown'}`}>
+            <span>Staff determination</span>
+            <strong>{sectionDecision === 'pass' ? 'Meets requirements' : sectionDecision === 'fail' ? 'Does not meet requirements' : recordedDecision === 'fail' ? 'Not required after confirmed failure' : 'Not recorded'}</strong>
+          </div>
+        ) : (
+          <div className="section-decision-buttons" aria-label={`${section.title} staff determination`}>
+            <button
+              className={sectionDecision === 'fail' ? 'decision-button decision-fail selected' : 'decision-button decision-fail'}
+              type="button"
+              onClick={() => firstAttentionCheck && onFail(firstAttentionCheck.id)}
+            >
+              Does not meet requirements
+            </button>
+            <button
+              className={sectionDecision === 'pass' ? 'decision-button decision-pass selected' : 'decision-button decision-pass'}
+              type="button"
+              onClick={() => onPass(section.checks.map((check) => check.id))}
+            >
+              Meets requirements
+            </button>
+          </div>
+        )
+      )}
+    </article>
+  )
+}
+
 function normalizeRotation(value: number): SavedRotation {
   return (((value % 360) + 360) % 360) as SavedRotation
 }
@@ -218,6 +330,7 @@ export function ReviewResults({
   const [naturalSize, setNaturalSize] = useState({ width: 1, height: 1 })
   const [viewedCheckIds, setViewedCheckIds] = useState<Set<string>>(() => new Set())
   const [commandBarOffset, setCommandBarOffset] = useState(96)
+  const [resultsView, setResultsView] = useState<'current' | 'simplified'>('current')
   const resultsSectionRef = useRef<HTMLElement | null>(null)
   const commandBarRef = useRef<HTMLDivElement | null>(null)
   const reviewApplication = result.application ?? application
@@ -230,6 +343,8 @@ export function ReviewResults({
       .map(({ check }) => check),
     [result.checks],
   )
+  const reviewSections = useMemo(() => buildReviewSections(result.checks), [result.checks])
+  const effectiveResultsView = amendmentCheckId ? 'current' : resultsView
   const checkSetKey = sortedChecks.map((check) => check.id).join('|')
   const activeCheckId = previewedCheck ?? selectedCheck
   const activeCheck = result.checks.find((check) => check.id === activeCheckId)
@@ -319,6 +434,14 @@ export function ReviewResults({
       return
     }
     const next = { ...staffDecisions, [id]: decision }
+    setStaffDecisions(next)
+    setSubmittedDecision(null)
+    if (result.checks.every((check) => next[check.id] === 'pass')) setPendingPass(true)
+  }
+
+  function passSection(checkIds: string[]) {
+    const next = { ...staffDecisions }
+    checkIds.forEach((id) => { next[id] = 'pass' })
     setStaffDecisions(next)
     setSubmittedDecision(null)
     if (result.checks.every((check) => next[check.id] === 'pass')) setPendingPass(true)
@@ -474,6 +597,19 @@ export function ReviewResults({
         </div>
       )}
 
+      {!amendmentCheckId && (
+        <section className="results-view-switch" aria-label="Results view">
+          <div>
+            <strong>Compare results layouts</strong>
+            <span>The current review remains available while you try the simplified preview.</span>
+          </div>
+          <div>
+            <button className={effectiveResultsView === 'current' ? 'selected' : ''} type="button" onClick={() => setResultsView('current')}>Current results</button>
+            <button className={effectiveResultsView === 'simplified' ? 'selected' : ''} type="button" onClick={() => setResultsView('simplified')}>Simplified preview</button>
+          </div>
+        </section>
+      )}
+
       <div className="results-comparison">
         <figure className="results-preview" aria-label="Label artwork with OCR highlight">
           <div className="results-preview-heading">
@@ -548,24 +684,43 @@ export function ReviewResults({
         </figure>
 
         <div>
-          <div className="check-list">
-            {sortedChecks.map((check) => (
-              <CheckCard
-                check={check}
-                active={activeCheckId === check.id}
-                decision={staffDecisions[check.id]}
-                key={check.id}
-                readOnly={readOnly}
-                recordedDecision={recordedDecision}
-                amendmentCheckId={amendmentCheckId}
-                onDecision={recordDecision}
-                onPreview={setPreviewedCheck}
-                onSelect={selectCheck}
-                onChangeDecision={onChangeDecision ? setPendingChangeId : undefined}
-              />
-            ))}
-          </div>
-          {!readOnly && !amendmentCheckId && allCardsViewed && remainingGreenChecks.length > 0 && (
+          {effectiveResultsView === 'current' ? (
+            <div className="check-list">
+              {sortedChecks.map((check) => (
+                <CheckCard
+                  check={check}
+                  active={activeCheckId === check.id}
+                  decision={staffDecisions[check.id]}
+                  key={check.id}
+                  readOnly={readOnly}
+                  recordedDecision={recordedDecision}
+                  amendmentCheckId={amendmentCheckId}
+                  onDecision={recordDecision}
+                  onPreview={setPreviewedCheck}
+                  onSelect={selectCheck}
+                  onChangeDecision={onChangeDecision ? setPendingChangeId : undefined}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="review-section-list">
+              {reviewSections.map((section) => (
+                <SimplifiedSection
+                  section={section}
+                  decisions={staffDecisions}
+                  key={section.id}
+                  readOnly={readOnly}
+                  recordedDecision={recordedDecision}
+                  activeCheckId={activeCheckId}
+                  onPass={passSection}
+                  onFail={(id) => recordDecision(id, 'fail')}
+                  onPreview={setPreviewedCheck}
+                  onSelect={selectCheck}
+                />
+              ))}
+            </div>
+          )}
+          {effectiveResultsView === 'current' && !readOnly && !amendmentCheckId && allCardsViewed && remainingGreenChecks.length > 0 && (
             <section className="pass-remaining-panel" aria-label="Pass remaining green findings">
               <div>
                 <strong>All review cards viewed</strong>

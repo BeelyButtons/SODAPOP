@@ -398,4 +398,30 @@ describe('ReviewResults', () => {
     await user.click(screen.getByRole('button', { name: /Confirm Pass decision/i }))
     expect(onFinalDecision).toHaveBeenCalledWith('pass', { warningText: 'pass', warningFormat: 'pass' }, 0)
   })
+
+  it('preserves the current results view as the default', () => {
+    render(<ReviewResults result={result} previewUrl="label.png" fileName="label.png" />)
+    expect(screen.getByRole('button', { name: 'Current results' })).toHaveClass('selected')
+    expect(screen.getByLabelText('Government warning wording automated finding')).toBeInTheDocument()
+  })
+
+  it('shows the same seven sections in the simplified preview', async () => {
+    const user = userEvent.setup()
+    render(<ReviewResults result={result} previewUrl="label.png" fileName="label.png" />)
+    await user.click(screen.getByRole('button', { name: 'Simplified preview' }))
+
+    for (const title of [
+      'Application completeness',
+      'Product identity',
+      'Alcohol and net contents',
+      'Responsible party and origin',
+      'Government warning',
+      'Formula and required disclosures',
+      'Other claims',
+    ]) expect(screen.getByRole('heading', { name: title })).toBeInTheDocument()
+
+    expect(screen.getAllByText('Not applicable')).toHaveLength(6)
+    expect(screen.getByText('1 item needs staff judgment · 1 check passed')).toBeInTheDocument()
+  })
 })
+
