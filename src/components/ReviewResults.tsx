@@ -239,7 +239,7 @@ function SimplifiedSection({
       <p className="review-section-summary">{sectionSummary(section)}</p>
 
       {section.checks.length > 0 && (
-        <details className="review-section-details" open={section.status === 'mismatch' || section.status === 'needs_review' || section.status === 'unverified'}>
+        <details className="review-section-details">
           <summary>View {section.checks.length} underlying {section.checks.length === 1 ? 'requirement' : 'requirements'}</summary>
           <div className="review-section-checks">
             {section.checks.map((check) => {
@@ -356,6 +356,10 @@ export function ReviewResults({
   const decidedCount = result.checks.filter((check) => staffDecisions[check.id]).length
   const applicableSections = reviewSections.filter((section) => section.checks.length > 0)
   const decidedSectionCount = applicableSections.filter((section) => section.checks.every((check) => staffDecisions[check.id])).length
+  const remainingPassedSectionChecks = reviewSections
+    .filter((section) => section.status === 'pass')
+    .flatMap((section) => section.checks)
+    .filter((check) => !staffDecisions[check.id])
   const remainingGreenChecks = result.checks.filter((check) => check.status === 'pass' && !staffDecisions[check.id])
   const allCardsViewed = result.checks.length > 0 && result.checks.every((check) => viewedCheckIds.has(check.id))
   const amendmentFinalDecision: QueueDecision | null = result.checks.some((check) => staffDecisions[check.id] === 'fail')
@@ -713,6 +717,15 @@ export function ReviewResults({
             </div>
           ) : (
             <div className="review-section-list">
+              {!readOnly && remainingPassedSectionChecks.length > 0 && (
+                <section className="accept-passed-sections" aria-label="Accept passed sections">
+                  <div>
+                    <strong>{reviewSections.filter((section) => section.status === 'pass').length} sections passed SODAPOP’s checks</strong>
+                    <span>Accept these together, then concentrate on the sections that still need your judgment.</span>
+                  </div>
+                  <button type="button" onClick={() => passSection(remainingPassedSectionChecks.map((check) => check.id))}>Accept passed sections</button>
+                </section>
+              )}
               {reviewSections.map((section) => (
                 <SimplifiedSection
                   section={section}

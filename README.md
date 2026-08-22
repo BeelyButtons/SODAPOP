@@ -16,6 +16,9 @@ SODAPOP — System for Optical Detection, Analysis & Packaging-Oversight Process
 - Saved 90-degree label rotation without an OCR rerun: working
 - Staff Pass/Fail determination for every reviewed item: working
 - View-gated bulk Pass for remaining green findings only: working; red and amber findings always require individual review
+- Reversible results-layout comparison: working on the feature branch; the current card view remains the default while a simplified preview groups every spirits, wine, and malt review into the same seven sections
+- Simplified section decisions: working; passed sections can be accepted together, related requirements stay available in collapsed details, and one section decision is recorded across its underlying checks
+- Recognition uncertainty separation: working in the simplified preview; failure to locate text is shown as `Not automatically verified`, while positively observed contradictions remain potential problems
 - Final decision rule and submission control: working
 - Synthetic compliant, failure, varied-layout, and difficult-photo cases: included
 - Pre-malt expanded-case benchmark: 3.6–4.9 seconds on clear, conditional, blurred, and obstructed samples with a warm OCR engine; the varied malt queue is the current hands-on performance check
@@ -23,7 +26,7 @@ SODAPOP — System for Optical Detection, Analysis & Packaging-Oversight Process
 - Angled-label deskewing and orientation-aware highlights: working
 - Rule-aware OCR recovery: working, with a two-pass limit, a 4.8-second recovery budget, selective upside-down recovery, and complementary evidence merging
 - URL-aware SPA views for the queue, individual cases, new-label intake, and results: working
-- Automated verification: 198 routing, rule-coverage, interface, OCR, decision-workflow, and regression tests passing, plus GitHub Pages production-build and lint checks
+- Automated verification: 209 routing, rule-coverage, interface, OCR, decision-workflow, and regression tests passing, plus GitHub Pages production-build and lint checks
 - Post-rule-expansion routing foundation: working, with seven TTB review/routing rule sets, tri-state applicability, automatic selection, transparent selection reasons, and reviewer overrides
 - Cached-evidence rule-set reanalysis: working without a second OCR pass; alternative rule sets are ranked only when the reviewer opens the rule control
 - Centered rule-set window: working with a pinned close control, outside-click and Escape dismissal, applicable-first rule details, collapsed non-applicable rules, focus restoration, and a compact alternative selector
@@ -71,6 +74,8 @@ SODAPOP — System for Optical Detection, Analysis & Packaging-Oversight Process
 31. Routes domestic wine below 7% alcohol out of Part 4 while still checking the Part 24 premises name/address, brand when different, alcohol content, net contents, kind of wine, and the Part 16 health warning when applicable; FDA rules remain outside this TTB prototype.
 32. Applies domestic and imported malt-beverage rules for brand, recognized or specialty identity, U.S.-unit net contents, responsible-party information, conditional alcohol content, low/non-alcoholic claims, country of origin, post-import bottling, geographic qualification, formula directions, sulfites, aspartame, Yellow No. 5, and cochineal/carmine.
 33. Distinguishes ordinary malt beverages from formula-backed specialties and reserves alcohol-content cards for statements that are mandatory, voluntarily displayed, or otherwise activated by the review evidence.
+34. Offers a reversible simplified-results preview with the same seven ordered sections for distilled spirits, wine, and malt beverages; category-specific and conditional requirements remain available beneath those stable headings.
+35. Keeps application-declared requirements in scope even when OCR misses their text, allows detected label claims to add scrutiny, and does not present a text-recognition miss as a confirmed contradiction in the simplified preview.
 
 The application uses meaningful browser routes even though it remains a client-side SPA:
 

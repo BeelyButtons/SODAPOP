@@ -423,5 +423,29 @@ describe('ReviewResults', () => {
     expect(screen.getAllByText('Not applicable')).toHaveLength(6)
     expect(screen.getByText('1 item needs staff judgment · 1 check passed')).toBeInTheDocument()
   })
-})
 
+  it('keeps underlying rules collapsed and accepts passed sections together', async () => {
+    const user = userEvent.setup()
+    const resultWithPassedSection: ReviewOutcome = {
+      ...result,
+      checks: [
+        ...result.checks,
+        {
+          id: 'common.label-set-completeness',
+          ruleId: 'common.label-set-completeness',
+          label: 'Complete label evidence',
+          status: 'pass',
+          expected: 'Complete label evidence',
+          observed: 'Complete',
+          explanation: 'The submitted evidence is complete.',
+        },
+      ],
+    }
+    render(<ReviewResults result={resultWithPassedSection} previewUrl="label.png" fileName="label.png" />)
+    await user.click(screen.getByRole('button', { name: 'Simplified preview' }))
+
+    expect(screen.getByText('Government warning wording')).not.toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Accept passed sections' }))
+    expect(screen.queryByRole('button', { name: 'Accept passed sections' })).not.toBeInTheDocument()
+  })
+})

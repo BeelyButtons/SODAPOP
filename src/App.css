@@ -1169,6 +1169,39 @@ footer {
   gap: 12px;
 }
 
+.accept-passed-sections {
+  align-items: center;
+  background: #e8f3eb;
+  border: 1px solid #bdd7c5;
+  border-radius: 14px;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  padding: 13px 15px;
+}
+
+.accept-passed-sections > div {
+  display: grid;
+  gap: 3px;
+}
+
+.accept-passed-sections span {
+  color: #506057;
+  font-size: .88rem;
+}
+
+.accept-passed-sections button {
+  background: #28643e;
+  border: 0;
+  border-radius: 9px;
+  color: #fff;
+  cursor: pointer;
+  flex: 0 0 auto;
+  font: inherit;
+  font-weight: 800;
+  padding: 10px 13px;
+}
+
 .review-section-card {
   background: #fff;
   border: 1px solid #d7ddd8;
@@ -1288,7 +1321,8 @@ footer {
 @media (max-width: 760px) {
   .results-view-switch,
   .review-section-heading,
-  .section-decision-buttons { align-items: stretch; flex-direction: column; }
+  .section-decision-buttons,
+  .accept-passed-sections { align-items: stretch; flex-direction: column; }
   .results-view-switch > div:last-child { width: 100%; }
   .results-view-switch button { flex: 1; }
 }
