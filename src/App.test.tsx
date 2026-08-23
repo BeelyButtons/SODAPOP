@@ -63,8 +63,13 @@ describe('LabelEvidence queue and human review', () => {
   it('explains the application-guided image review before entering the workspace', () => {
     render(<App />)
     expect(screen.getByRole('heading', { name: /built around the human decision/i })).toBeInTheDocument()
-    expect(screen.getByText(/The application selects the rules/i)).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: /56 image-and-application cases across eight review profiles/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'How to use LabelEvidence' })).toBeInTheDocument()
+    expect(screen.getByText(/To begin the label review process, click/i)).toBeInTheDocument()
+    expect(screen.getByText(/Application-guided image review/i)).toBeInTheDocument()
+    expect(screen.getByText(/Applicant prescreen/i)).toBeInTheDocument()
+    expect(screen.queryByText('Build the review questions')).not.toBeInTheDocument()
+    expect(screen.queryByText('Read the actual image')).not.toBeInTheDocument()
+    expect(screen.queryByText('Keep the human in control')).not.toBeInTheDocument()
     expect(screen.getByText(/does not connect to TTB systems/i)).toBeInTheDocument()
   })
 
