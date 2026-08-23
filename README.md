@@ -2,7 +2,7 @@
 
 LabelEvidence is an evidence-led alcohol label review prototype. It compares product application information with actual label artwork and the requirements that apply to that product, then directs unresolved questions to a human reviewer.
 
-**Live demonstration:** [https://beelybuttons.github.io/SODAPOP/](https://beelybuttons.github.io/SODAPOP/)
+**Live demonstration:** [https://beelybuttons.github.io/LabelEvidence/](https://beelybuttons.github.io/LabelEvidence/)
 
 ## Current demonstration
 
@@ -221,8 +221,8 @@ OCR runs locally in the browser. The demonstration does not require a cloud mach
 Requirements: a current Node.js installation with npm.
 
 ```bash
-git clone https://github.com/BeelyButtons/SODAPOP.git
-cd SODAPOP
+git clone https://github.com/BeelyButtons/LabelEvidence.git
+cd LabelEvidence
 npm install
 npm run dev
 ```

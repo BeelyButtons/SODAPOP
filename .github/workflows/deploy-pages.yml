@@ -33,7 +33,7 @@ jobs:
       - name: Build public application
         run: npm run build
         env:
-          BASE_PATH: /SODAPOP/
+          BASE_PATH: /${{ github.event.repository.name }}/
       - name: Add single-page route fallback
         run: cp dist/index.html dist/404.html
       - name: Configure GitHub Pages
