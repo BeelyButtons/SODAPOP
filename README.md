@@ -22,6 +22,11 @@ The prototype does not receive a fixture's intended result or structured label-a
 - Local label-viewing controls for zoom, rotation, brightness, and contrast
 - Expandable complete review
 - Reviewer-attested bulk approval for labels with no detected red flags
+- A batch introduction that appears when the reviewer reaches a batch—not while OCR is running
+- A batch overview with potential-concern labels first and clear labels available for individual or attested group approval
+- Completed reviews removed from the active queue and retained in a decision-history page with a Review again action
+- An applicant-facing Domestic Distilled Spirits prescreen with editable sample application information and a label-image upload
+- Defensive applicant upload handling: PNG/JPEG signatures, MIME consistency, file-size and pixel limits, browser decoding, and PNG re-encoding before OCR
 
 ### Routing profiles
 
@@ -59,6 +64,8 @@ npm run dev
 
 Open [http://localhost:5173/](http://localhost:5173/).
 
+The reviewer queue is at [http://localhost:5173/queue](http://localhost:5173/queue). The applicant-facing demonstration is at [http://localhost:5173/prescreen](http://localhost:5173/prescreen).
+
 ## Verification
 
 ```bash
@@ -67,10 +74,10 @@ npm run lint
 npm run build
 ```
 
-The current suite verifies the 56-case distribution, absence of runtime expected-result fields, balanced 40-label selection, saved queue randomization, FIFO batch rules, manual analysis start, concrete expected-versus-observed evidence, separate human concerns, passed-check disagreements, reviewer-attested batch approval, explicit final-decision confirmation, and the underlying rule-engine behavior retained in the repository. Real OCR behavior is also checked in the running browser because it intentionally is not replaced by a structured fixture evaluator.
+The current suite verifies the 56-case distribution, absence of runtime expected-result fields, balanced 40-label selection, saved queue randomization, FIFO batch rules, manual analysis start, concrete expected-versus-observed evidence, separate human concerns, passed-check disagreements, reviewer-attested batch approval, explicit final-decision confirmation, completed-review reopening, editable applicant application data, defensive image-header validation, and the underlying rule-engine behavior retained in the repository. Real OCR behavior is also checked in the running browser because it intentionally is not replaced by a structured fixture evaluator.
 
 ## Prototype boundary
 
-The current case library demonstrates the architecture and reviewer workflow through a controlled subset of product facts and review conditions. It is not represented as a complete implementation of every TTB, FDA, CBP, USDA, or other regulatory requirement. Expanding regulatory coverage requires sourced rules, effective-date management, expert validation, and additional evidence types.
+The current case library demonstrates the architecture and reviewer workflow through a controlled subset of product facts and review conditions. It is not represented as a complete implementation of every TTB, FDA, CBP, USDA, or other regulatory requirement. Expanding regulatory coverage requires sourced rules, effective-date management, expert validation, and additional evidence types. The applicant prescreen is browser-local advisory functionality: it does not upload to a server, submit an application, issue a COLA, guarantee approval, or replace production server-side security controls.
 
 The previous reviewer prototype is preserved by Git checkpoint `checkpoint/pre-label-evidence-2026-08-22`. The active redesign lives on `feature/label-evidence-reboot`.

@@ -2,7 +2,9 @@ import { cleanup, render, screen, waitFor, within } from '@testing-library/react
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
-import { evaluateImageCase } from './labelEvidence/imageEvaluation'
+import { LABEL_EVIDENCE_CASES } from './labelEvidence/cases'
+import { evaluateImageCase, evaluateUploadedImageCase } from './labelEvidence/imageEvaluation'
+import { createRandomizedReviewQueue } from './labelEvidence/reviewQueue'
 import type { LabelEvidenceCase, ReviewFlag } from './labelEvidence/types'
 import { warmOcrEngine } from './ocr/recognizeLabel'
 
@@ -29,14 +31,19 @@ vi.mock('./labelEvidence/imageEvaluation', () => ({
       outcome: { status: flags.length ? 'needs_review' as const : 'pass' as const, checks: [], ocrText: '', ocrConfidence: 94, durationMs: 2075 },
     }
   }),
+  evaluateUploadedImageCase: vi.fn(async (item: LabelEvidenceCase) => ({
+    caseId: item.id, categoryId: item.category.id, flags: [],
+    checks: [{ id: 'brand', label: 'Brand name', status: 'confirmed' as const, detail: 'The submitted image agrees with the application.', expected: item.application.brandName, observed: item.application.brandName }],
+    reviewedAt: '2026-08-23T12:00:00.000Z', durationMs: 2300, rulesDurationMs: 25, ocrConfidence: 94,
+    imageUrl: 'data:image/png;base64,AA==', imageFile: new File(['label'], 'upload.png', { type: 'image/png' }), questions: [],
+    outcome: { status: 'pass' as const, checks: [], ocrText: '', ocrConfidence: 94, durationMs: 2275 },
+  })),
 }))
 
 async function enterAndCompleteAnalysis(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getAllByRole('button', { name: 'Go to LabelEvidence' })[0])
   await user.click(screen.getByRole('button', { name: 'Begin AI analysis' }))
   await waitFor(() => expect(evaluateImageCase).toHaveBeenCalledTimes(56))
-  const notice = screen.queryByRole('dialog', { name: /LabelEvidence found a batch/i })
-  if (notice) await user.click(within(notice).getByRole('button', { name: 'Continue' }))
 }
 
 function queueRow(caseId: string) {
@@ -73,7 +80,7 @@ describe('LabelEvidence queue and human review', () => {
     await user.click(screen.getByRole('button', { name: 'Begin AI analysis' }))
     await waitFor(() => expect(evaluateImageCase).toHaveBeenCalledTimes(56))
     expect(screen.getAllByText('Evaluated by AI in 2.10 seconds')).toHaveLength(56)
-    expect(screen.getByText(/Additional information from the stakeholder/i)).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: /LabelEvidence found a batch/i })).not.toBeInTheDocument()
   })
 
   it('keeps queue order across navigation and creates a new order only on reset', async () => {
@@ -83,7 +90,7 @@ describe('LabelEvidence queue and human review', () => {
     await user.click(screen.getAllByRole('button', { name: 'Go to LabelEvidence' })[0])
     const firstSeed = window.localStorage.getItem('labelevidence.randomized-queue-seed.v1')
     const firstCase = document.querySelector('.library-row .case-name small')?.textContent
-    await user.click(screen.getByRole('button', { name: 'About LabelEvidence' }))
+    await user.click(screen.getByRole('button', { name: 'About' }))
     await user.click(screen.getAllByRole('button', { name: 'Go to LabelEvidence' })[0])
     expect(document.querySelector('.library-row .case-name small')?.textContent).toBe(firstCase)
     expect(window.localStorage.getItem('labelevidence.randomized-queue-seed.v1')).toBe(firstSeed)
@@ -131,5 +138,52 @@ describe('LabelEvidence queue and human review', () => {
     expect(confirm).toBeDisabled()
     await user.type(screen.getByRole('textbox', { name: 'Reviewer note' }), 'The country-of-origin statement is misleading.')
     expect(confirm).toBeEnabled()
+  })
+
+  it('introduces a batch only when human review reaches it, then shows the batch overview', async () => {
+    const seed = 20260823
+    const queue = createRandomizedReviewQueue(LABEL_EVIDENCE_CASES.map((item) => item.id), seed)
+    const firstTwoIds = queue.slice(0, 2).flatMap((unit) => unit.caseIds)
+    window.localStorage.setItem('labelevidence.randomized-queue-seed.v1', String(seed))
+    window.localStorage.setItem('labelevidence.reviewer-decisions.v3', JSON.stringify(Object.fromEntries(firstTwoIds.map((id) => [id, { finalDecision: 'approved', draftDecision: 'approved', decidedAt: '2026-08-23T12:00:00.000Z' }]))))
+    const user = userEvent.setup()
+    render(<App />)
+    await enterAndCompleteAnalysis(user)
+    expect(screen.queryByRole('dialog', { name: /LabelEvidence found a batch/i })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Begin or resume human review' }))
+    const notice = screen.getByRole('dialog', { name: /LabelEvidence found a batch of 5 labels/i })
+    expect(window.location.pathname).toBe('/review-batch/batch-001')
+    await user.click(within(notice).getByRole('button', { name: 'Continue' }))
+    expect(screen.getByRole('heading', { name: 'Batch overview' })).toBeInTheDocument()
+  })
+
+  it('moves completed decisions out of the active queue and allows another review', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await enterAndCompleteAnalysis(user)
+    await user.click(within(queueRow('LE-001')).getByRole('button', { name: 'Review label' }))
+    await user.click(screen.getByRole('button', { name: 'Approve label' }))
+    await user.click(screen.getByRole('button', { name: /Confirm and proceed/i }))
+    await user.click(screen.getByRole('button', { name: 'Active queue' }))
+    expect(screen.queryByText(/LE-001 ·/)).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Completed reviews' }))
+    const completed = screen.getByText(/LE-001 ·/).closest('article') as HTMLElement
+    await user.click(within(completed).getByRole('button', { name: 'Review again' }))
+    expect(screen.getByRole('button', { name: 'Change saved decision' })).toBeInTheDocument()
+  })
+
+  it('offers an editable domestic-spirit applicant prescreen without submitting anything', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(screen.getAllByRole('button', { name: 'Go to LabelEvidence' })[0])
+    await user.click(screen.getByRole('button', { name: 'Applicant prescreen' }))
+    expect(screen.getByRole('heading', { name: /Prescreen your domestic spirits label/i })).toBeInTheDocument()
+    expect(screen.getByText(/does not submit an application/i)).toBeInTheDocument()
+    const brand = screen.getByRole('textbox', { name: 'Brand name' })
+    expect(brand).toHaveValue('Cedar Ridge Distilling')
+    await user.clear(brand)
+    await user.type(brand, 'My Test Distillery')
+    expect(brand).toHaveValue('My Test Distillery')
+    expect(evaluateUploadedImageCase).not.toHaveBeenCalled()
   })
 })

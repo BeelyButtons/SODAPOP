@@ -218,10 +218,9 @@ function checkToResult(check: ReviewCheck): ReviewCheckResult {
   return { id: check.id, label: check.label, status: check.status === 'pass' ? 'confirmed' : 'flagged', detail: check.explanation, expected: check.expected, observed: check.observed }
 }
 
-export async function evaluateImageCase(item: LabelEvidenceCase, onProgress: (progress: OcrProgress) => void): Promise<ImageCaseEvaluation> {
+async function evaluateImageFile(item: LabelEvidenceCase, imageFile: File, onProgress: (progress: OcrProgress) => void): Promise<ImageCaseEvaluation> {
   const application = applicationDataForCase(item)
   const { selection, questions } = createEvidenceQuestions(application)
-  const imageFile = await createCaseImageFile(item)
   const ocr = await recognizeLabel(imageFile, application, onProgress, questions)
   const presentation = await warningPresentation(imageFile, ocr.words, ocr.imageWidth, ocr.imageHeight)
   const rulesStarted = performance.now()
@@ -266,4 +265,12 @@ export async function evaluateImageCase(item: LabelEvidenceCase, onProgress: (pr
     questions,
     outcome,
   }
+}
+
+export async function evaluateImageCase(item: LabelEvidenceCase, onProgress: (progress: OcrProgress) => void): Promise<ImageCaseEvaluation> {
+  return evaluateImageFile(item, await createCaseImageFile(item), onProgress)
+}
+
+export async function evaluateUploadedImageCase(item: LabelEvidenceCase, imageFile: File, onProgress: (progress: OcrProgress) => void): Promise<ImageCaseEvaluation> {
+  return evaluateImageFile(item, imageFile, onProgress)
 }

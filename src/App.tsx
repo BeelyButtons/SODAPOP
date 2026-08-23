@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
+import { ApplicantPrescreen } from './components/ApplicantPrescreen'
 import { selectBalancedCases } from './labelEvidence/batch'
 import { LABEL_EVIDENCE_CASES, ROUTING_CATEGORIES } from './labelEvidence/cases'
 import { evaluateImageCase, type ImageCaseEvaluation } from './labelEvidence/imageEvaluation'
@@ -9,7 +10,7 @@ import { warmOcrEngine, type OcrProgress } from './ocr/recognizeLabel'
 
 type FlagDecision = 'confirmed' | 'dismissed'
 type FinalDecision = 'approved' | 'returned'
-type Route = { page: 'about' | 'queue' | 'review' | 'batch'; caseId?: string }
+type Route = { page: 'about' | 'queue' | 'review' | 'batch' | 'batch-review' | 'completed' | 'prescreen'; caseId?: string; unitId?: string }
 
 interface StoredCaseReview {
   flagDecisions: Record<string, FlagDecision>
@@ -27,7 +28,8 @@ const LEGACY_REVIEW_STORAGE_KEY = 'labelevidence.reviewer-decisions.v2'
 const QUEUE_SEED_KEY = 'labelevidence.randomized-queue-seed.v1'
 const ANALYSIS_STARTED_KEY = 'labelevidence.analysis-started.v1'
 const RESUME_CASE_KEY = 'labelevidence.resume-case.v1'
-const BATCH_NOTICES_KEY = 'labelevidence.batch-notices.v1'
+const BATCH_NOTICES_KEY = 'labelevidence.human-batch-intros.v1'
+const LEGACY_BATCH_NOTICES_KEY = 'labelevidence.batch-notices.v1'
 
 function emptyReview(): StoredCaseReview {
   return { flagDecisions: {}, checkDisagreements: {}, note: '' }
@@ -63,7 +65,11 @@ function readBatchNotices() {
 
 function routeFromPath(pathname: string): Route {
   const review = pathname.match(/^\/review\/([^/]+)$/)
+  const batchReview = pathname.match(/^\/review-batch\/([^/]+)$/)
   if (review) return { page: 'review', caseId: decodeURIComponent(review[1]) }
+  if (batchReview) return { page: 'batch-review', unitId: decodeURIComponent(batchReview[1]) }
+  if (pathname.startsWith('/completed')) return { page: 'completed' }
+  if (pathname.startsWith('/prescreen')) return { page: 'prescreen' }
   if (pathname.startsWith('/queue')) return { page: 'queue' }
   if (pathname.startsWith('/batch')) return { page: 'batch' }
   return { page: 'about' }
@@ -185,21 +191,38 @@ function QueueDashboard({ units, casesById, evaluations, processing, errors, rev
   description?: string
 }) {
   const orderedIds = units.flatMap((unit) => unit.caseIds)
+  const positions = new Map(orderedIds.map((id, index) => [id, index + 1]))
+  const activeUnits = units.map((unit) => ({ ...unit, caseIds: unit.caseIds.filter((id) => !reviews[id]?.finalDecision) } as ReviewQueueUnit)).filter((unit) => unit.caseIds.length)
   const evaluatedCount = orderedIds.filter((id) => evaluations[id]).length
   const completedCount = orderedIds.filter((id) => reviews[id]?.finalDecision).length
   const readyCount = orderedIds.filter((id) => evaluations[id] && !reviews[id]?.finalDecision).length
-  let position = 0
   return <main className="queue-page"><section className="queue-heading"><div><p className="eyebrow">First-in, first-out review</p><h1>{title}</h1><p>{description}</p></div><div className="queue-summary"><span><strong>{orderedIds.length}</strong>Total labels</span><span><strong>{evaluatedCount}</strong>AI evaluated</span><span><strong>{readyCount}</strong>Ready for human</span><span><strong>{completedCount}</strong>Human decisions</span></div></section>
     <section className="analysis-command"><div>{!analysisStarted ? <><h2>AI analysis has not started</h2><p>Every row will remain untouched until you begin. OCR, image analysis, and routed rule checks will then run in the saved order.</p></> : processing ? <><h2>AI analysis is continuing in the background</h2><p>{casesById.get(processing.caseId)?.displayName} · {processing.message} · {processing.progress}%</p></> : evaluatedCount === orderedIds.length ? <><h2>AI analysis complete</h2><p>All {orderedIds.length} labels have image-and-rule results.</p></> : <><h2>AI analysis is preparing</h2><p>The local image reader is starting.</p></>}</div><div><button className="primary-button" type="button" disabled={analysisStarted} onClick={onStartAnalysis}>{analysisStarted ? 'AI analysis started' : 'Begin AI analysis'}</button><button className="secondary-button" type="button" disabled={!readyCount} onClick={onStartHumanReview}>{readyCount ? 'Begin or resume human review' : 'Human review waiting for AI'}</button></div></section>
-    <section className="queue-library" aria-label="Label review library">{units.map((unit, unitIndex) => {
+    <section className="queue-library" aria-label="Label review library">{activeUnits.length === 0 && completedCount > 0 && <section className="queue-empty"><strong>All available reviews are complete.</strong><p>Open Completed reviews to see decisions or review a label again.</p></section>}{activeUnits.map((unit) => {
+      const unitIndex = units.findIndex((candidate) => candidate.id === unit.id)
       const clearReady = unit.kind === 'batch' ? unit.caseIds.filter((id) => evaluations[id] && !evaluations[id].flags.length && !reviews[id]?.finalDecision) : []
-      return <section className={`queue-unit ${unit.kind}`} key={unit.id}><header><div><p className="eyebrow">Queue unit {unitIndex + 1}</p><h2>{unit.kind === 'batch' ? `Batch of ${unit.caseIds.length} labels` : 'Individual label'}</h2></div><span>{unit.kind === 'batch' ? 'Batch detected' : 'Single application'}</span></header><div className="library-table" role="table" aria-label={`${unit.kind === 'batch' ? 'Batch' : 'Individual'} queue unit`}><div className="library-table-head" role="row"><span>Order</span><span>Application</span><span>AI analysis</span><span>Human decision</span><span>Action</span></div>{unit.caseIds.map((id) => { position += 1; const item = casesById.get(id)!; return <QueueRow key={id} item={item} evaluation={evaluations[id]} processing={processing} error={errors[id]} review={reviews[id]} position={position} onOpen={() => onOpen(id)} /> })}</div>{clearReady.length > 0 && <div className="batch-approval"><label><input type="checkbox" checked={Boolean(bulkAttested[unit.id])} onChange={(event) => onBulkAttested(unit.id, event.target.checked)} />I understand that LabelEvidence detected no red flags for these {clearReady.length} labels. I reviewed them and authorize their approval.</label><button type="button" disabled={!bulkAttested[unit.id]} onClick={() => onBulkApprove(clearReady)}>Approve these clear labels</button></div>}</section>
+      return <section className={`queue-unit ${unit.kind}`} key={unit.id}><header><div><p className="eyebrow">Queue unit {unitIndex + 1}</p><h2>{unit.kind === 'batch' ? `Batch of ${units[unitIndex].caseIds.length} labels` : 'Individual label'}</h2></div><span>{unit.kind === 'batch' ? 'Batch detected' : 'Single application'}</span></header><div className="library-table" role="table" aria-label={`${unit.kind === 'batch' ? 'Batch' : 'Individual'} queue unit`}><div className="library-table-head" role="row"><span>Order</span><span>Application</span><span>AI analysis</span><span>Human decision</span><span>Action</span></div>{unit.caseIds.map((id) => { const item = casesById.get(id)!; return <QueueRow key={id} item={item} evaluation={evaluations[id]} processing={processing} error={errors[id]} review={reviews[id]} position={positions.get(id)!} onOpen={() => onOpen(id)} /> })}</div>{clearReady.length > 0 && <div className="batch-approval"><label><input type="checkbox" checked={Boolean(bulkAttested[unit.id])} onChange={(event) => onBulkAttested(unit.id, event.target.checked)} />I understand that LabelEvidence detected no red flags for these {clearReady.length} labels. I reviewed them and authorize their approval.</label><button type="button" disabled={!bulkAttested[unit.id]} onClick={() => onBulkApprove(clearReady)}>Approve these clear labels</button></div>}</section>
     })}</section>
   </main>
 }
 
 function BatchNotice({ unit, onClose }: { unit: ReviewQueueUnit; onClose: () => void }) {
   return <div className="notice-backdrop"><section className="batch-notice" role="dialog" aria-modal="true" aria-labelledby="batch-notice-title"><p className="eyebrow">Batch detected</p><h2 id="batch-notice-title">LabelEvidence found a batch of {unit.caseIds.length} labels.</h2><p>The prototype will keep each label’s review and final decision separate while allowing clear labels to be approved together.</p><p>Additional information from the stakeholder about how real batches are identified and submitted would let us improve this workflow further.</p><button className="primary-button" type="button" onClick={onClose}>Continue</button></section></div>
+}
+
+function CompletedReviews({ order, casesById, evaluations, reviews, onReviewAgain }: { order: string[]; casesById: Map<string, LabelEvidenceCase>; evaluations: Record<string, ImageCaseEvaluation>; reviews: Record<string, StoredCaseReview>; onReviewAgain: (id: string) => void }) {
+  const completed = order.filter((id) => reviews[id]?.finalDecision)
+  return <main className="queue-page"><section className="queue-heading"><div><p className="eyebrow">Decision history</p><h1>Completed reviews</h1><p>Confirmed decisions leave the active queue. Reviewers can inspect the saved result and reopen any label if the decision needs to change.</p></div><div className="queue-summary completed-summary"><span><strong>{completed.length}</strong>Completed</span><span><strong>{completed.filter((id) => reviews[id].finalDecision === 'approved').length}</strong>Approved</span><span><strong>{completed.filter((id) => reviews[id].finalDecision === 'returned').length}</strong>Returned</span></div></section>{completed.length === 0 ? <section className="queue-empty"><strong>No completed reviews yet.</strong><p>A label appears here after the reviewer explicitly confirms the final decision.</p></section> : <section className="completed-list">{completed.map((id) => { const item = casesById.get(id)!; const review = reviews[id]; const evaluation = evaluations[id]; return <article key={id}><div><span className={`decision-pill ${review.finalDecision}`}>{review.finalDecision === 'approved' ? 'Approved' : 'Returned for correction'}</span><h2>{item.displayName}</h2><p>{id} · {item.category.shortLabel}</p></div><dl><div><dt>AI result</dt><dd>{evaluation ? evaluation.flags.length ? `${evaluation.flags.length} concern${evaluation.flags.length === 1 ? '' : 's'}` : 'No AI concerns' : 'Result unavailable after refresh'}</dd></div><div><dt>Reviewer note</dt><dd>{review.note || 'No note entered'}</dd></div><div><dt>Decision saved</dt><dd>{review.decidedAt ? new Date(review.decidedAt).toLocaleString() : 'Date unavailable'}</dd></div></dl><button type="button" onClick={() => onReviewAgain(id)}>Review again</button></article>})}</section>}</main>
+}
+
+function BatchOverview({ unit, casesById, evaluations, reviews, bulkAttested, onBulkAttested, onBulkApprove, onOpen, onContinue }: { unit: ReviewQueueUnit; casesById: Map<string, LabelEvidenceCase>; evaluations: Record<string, ImageCaseEvaluation>; reviews: Record<string, StoredCaseReview>; bulkAttested: boolean; onBulkAttested: (value: boolean) => void; onBulkApprove: (ids: string[]) => void; onOpen: (id: string) => void; onContinue: () => void }) {
+  const unresolved = unit.caseIds.filter((id) => !reviews[id]?.finalDecision)
+  const attention = unresolved.filter((id) => evaluations[id]?.flags.length)
+  const clear = unresolved.filter((id) => evaluations[id] && !evaluations[id].flags.length)
+  const waiting = unresolved.filter((id) => !evaluations[id])
+  const completed = unit.caseIds.filter((id) => reviews[id]?.finalDecision)
+  function card(id: string) { const item = casesById.get(id)!; const evaluation = evaluations[id]; return <article className="batch-case-card" key={id}><img src={evaluation?.imageUrl} alt="" /><div><strong>{item.displayName}</strong><span>{id} · {item.category.shortLabel}</span><small>{evaluation ? `Evaluated in ${formatDuration(evaluation.durationMs)}` : 'Waiting for AI analysis'}</small></div><button type="button" disabled={!evaluation} onClick={() => onOpen(id)}>{reviews[id]?.draftDecision ? 'Resume review' : 'Review label'}</button></article> }
+  return <main className="batch-overview"><header><div><p className="eyebrow">Human review · Batch of {unit.caseIds.length}</p><h1>Batch overview</h1><p>Review labels needing attention individually. Clear labels may be opened one at a time or approved together after reviewer attestation.</p></div><span>{completed.length} of {unit.caseIds.length} completed</span></header>{attention.length > 0 && <section className="batch-section attention"><div><p className="eyebrow">Human attention required</p><h2>{attention.length} label{attention.length === 1 ? '' : 's'} with potential concerns</h2><p>Each of these labels requires an individual human decision.</p></div><div className="batch-card-grid">{attention.map(card)}</div></section>}{clear.length > 0 && <section className="batch-section clear"><div><p className="eyebrow">No AI concerns detected</p><h2>{clear.length} clear label{clear.length === 1 ? '' : 's'}</h2><p>Open any label for its complete evidence review, or review this overview and approve the group together.</p></div><div className="batch-card-grid">{clear.map(card)}</div><div className="batch-overview-attestation"><label><input type="checkbox" checked={bulkAttested} onChange={(event) => onBulkAttested(event.target.checked)} />I understand that LabelEvidence detected no red flags for these {clear.length} labels. I reviewed them and authorize their approval.</label><button type="button" disabled={!bulkAttested} onClick={() => onBulkApprove(clear)}>Approve these clear labels</button></div></section>}{waiting.length > 0 && <section className="batch-section waiting"><h2>{waiting.length} label{waiting.length === 1 ? '' : 's'} still being analyzed</h2><p>AI analysis is continuing in the background. Completed results will appear here.</p></section>}{unresolved.length === 0 && <section className="batch-finished"><span aria-hidden="true">✓</span><h2>Batch review complete</h2><p>All {unit.caseIds.length} labels have a confirmed human decision.</p><button className="primary-button" type="button" onClick={onContinue}>Continue to next queue item</button></section>}</main>
 }
 
 function App() {
@@ -212,11 +235,10 @@ function App() {
   const [analysisErrors, setAnalysisErrors] = useState<Record<string, string>>({})
   const [reviews, setReviews] = useState<Record<string, StoredCaseReview>>(readStoredReviews)
   const [bulkAttested, setBulkAttested] = useState<Record<string, boolean>>({})
-  const [batchNotices, setBatchNotices] = useState<ReviewQueueUnit[]>([])
   const [shownBatchNotices, setShownBatchNotices] = useState<Set<string>>(readBatchNotices)
+  const [reviewReturnPath, setReviewReturnPath] = useState('/queue')
   const [evaluationRun, setEvaluationRun] = useState(0)
   const evaluationsRef = useRef(evaluations)
-  const shownBatchNoticesRef = useRef(shownBatchNotices)
   const casesById = useMemo(() => new Map(LABEL_EVIDENCE_CASES.map((item) => [item.id, item])), [])
   const queue = useMemo(() => queueSeed === null ? [] : createRandomizedReviewQueue(LABEL_EVIDENCE_CASES.map((item) => item.id), queueSeed), [queueSeed])
   const queueOrder = useMemo(() => queue.flatMap((unit) => unit.caseIds), [queue])
@@ -242,12 +264,11 @@ function App() {
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
   }, [])
-  useEffect(() => { document.title = route.page === 'about' ? 'About LabelEvidence' : route.page === 'review' ? `Review ${route.caseId} · LabelEvidence` : 'LabelEvidence · Review queue' }, [route.caseId, route.page])
+  useEffect(() => { document.title = route.page === 'about' ? 'About LabelEvidence' : route.page === 'review' ? `Review ${route.caseId} · LabelEvidence` : route.page === 'prescreen' ? 'Applicant prescreen · LabelEvidence' : route.page === 'completed' ? 'Completed reviews · LabelEvidence' : 'LabelEvidence · Review queue' }, [route.caseId, route.page])
   useEffect(() => { evaluationsRef.current = evaluations }, [evaluations])
-  useEffect(() => { shownBatchNoticesRef.current = shownBatchNotices }, [shownBatchNotices])
   useEffect(() => { window.localStorage.setItem(REVIEW_STORAGE_KEY, JSON.stringify(reviews)) }, [reviews])
   useEffect(() => {
-    if ((route.page === 'queue' || route.page === 'review' || route.page === 'batch') && queueSeed === null) {
+    if ((route.page === 'queue' || route.page === 'review' || route.page === 'batch' || route.page === 'batch-review' || route.page === 'completed') && queueSeed === null) {
       const seed = newQueueSeed()
       window.localStorage.setItem(QUEUE_SEED_KEY, String(seed))
       setQueueSeed(seed)
@@ -263,15 +284,6 @@ function App() {
       }
       for (const unit of queue) {
         if (cancelled) return
-        if (unit.kind === 'batch' && shownBatchNoticesRef.current.size === 0) {
-          setShownBatchNotices((current) => {
-            const next = new Set(current).add(unit.id)
-            shownBatchNoticesRef.current = next
-            window.localStorage.setItem(BATCH_NOTICES_KEY, JSON.stringify([...next]))
-            return next
-          })
-          setBatchNotices((current) => [...current, unit])
-        }
         for (const caseId of unit.caseIds) {
           if (cancelled) return
           if (evaluationsRef.current[caseId]) continue
@@ -297,22 +309,41 @@ function App() {
 
   function enterWorkspace() { ensureQueue(); navigate('/queue') }
   function startAnalysis() { ensureQueue(); window.localStorage.setItem(ANALYSIS_STARTED_KEY, 'true'); setAnalysisStarted(true) }
-  function openReview(caseId: string) { window.localStorage.setItem(RESUME_CASE_KEY, caseId); navigate(`/review/${encodeURIComponent(caseId)}`) }
+  function openReview(caseId: string, returnPath = '/queue') { setReviewReturnPath(returnPath); window.localStorage.setItem(RESUME_CASE_KEY, caseId); navigate(`/review/${encodeURIComponent(caseId)}`) }
+  function openBatchReview(unit: ReviewQueueUnit) { navigate(`/review-batch/${encodeURIComponent(unit.id)}`) }
   function updateReview(caseId: string, review: StoredCaseReview) { setReviews((current) => ({ ...current, [caseId]: review })) }
+  function unitForCase(caseId: string) { return queue.find((unit) => unit.caseIds.includes(caseId)) }
+  function openUnit(unit: ReviewQueueUnit) {
+    if (unit.kind === 'batch') { openBatchReview(unit); return }
+    const ready = unit.caseIds.find((id) => evaluations[id] && !reviews[id]?.finalDecision)
+    if (ready) openReview(ready)
+  }
   function startHumanReview() {
     const resume = window.localStorage.getItem(RESUME_CASE_KEY)
-    const candidate = resume && evaluations[resume] && !reviews[resume]?.finalDecision ? resume : queueOrder.find((id) => evaluations[id] && !reviews[id]?.finalDecision)
-    if (candidate) openReview(candidate)
+    if (resume && evaluations[resume] && !reviews[resume]?.finalDecision) { const unit = unitForCase(resume); if (unit?.kind === 'batch') openBatchReview(unit); else openReview(resume); return }
+    const unit = queue.find((candidate) => candidate.caseIds.some((id) => evaluations[id] && !reviews[id]?.finalDecision))
+    if (unit) openUnit(unit)
   }
   function confirmAndProceed(caseId: string, review: StoredCaseReview) {
     if (!review.draftDecision) return
     const finalized: StoredCaseReview = { ...review, finalDecision: review.draftDecision, decidedAt: new Date().toISOString() }
     const nextReviews = { ...reviews, [caseId]: finalized }
     setReviews(nextReviews)
-    const currentIndex = queueOrder.indexOf(caseId)
-    const next = [...queueOrder.slice(currentIndex + 1), ...queueOrder.slice(0, currentIndex)].find((id) => evaluations[id] && !nextReviews[id]?.finalDecision)
-    if (next) openReview(next)
+    if (reviewReturnPath === '/completed') { navigate('/completed'); return }
+    const currentUnit = unitForCase(caseId)
+    if (currentUnit?.kind === 'batch') { openBatchReview(currentUnit); return }
+    const currentUnitIndex = queue.findIndex((unit) => unit.id === currentUnit?.id)
+    const nextUnit = [...queue.slice(currentUnitIndex + 1), ...queue.slice(0, Math.max(0, currentUnitIndex))].find((unit) => unit.caseIds.some((id) => evaluations[id] && !nextReviews[id]?.finalDecision))
+    if (nextUnit) openUnit(nextUnit)
     else { window.localStorage.removeItem(RESUME_CASE_KEY); navigate('/queue') }
+  }
+  function continueAfterBatch(unit: ReviewQueueUnit) {
+    const index = queue.findIndex((candidate) => candidate.id === unit.id)
+    const next = queue.slice(index + 1).find((candidate) => candidate.caseIds.some((id) => evaluations[id] && !reviews[id]?.finalDecision))
+    if (next) openUnit(next); else navigate('/queue')
+  }
+  function acknowledgeBatch(unit: ReviewQueueUnit) {
+    setShownBatchNotices((current) => { const next = new Set(current).add(unit.id); window.localStorage.setItem(BATCH_NOTICES_KEY, JSON.stringify([...next])); return next })
   }
   async function rerunEvaluation(caseId: string) {
     const existing = evaluations[caseId]
@@ -336,7 +367,7 @@ function App() {
     Object.values(evaluations).forEach((evaluation) => URL.revokeObjectURL(evaluation.imageUrl))
     const seed = newQueueSeed()
     window.localStorage.setItem(QUEUE_SEED_KEY, String(seed))
-    ;[REVIEW_STORAGE_KEY, LEGACY_REVIEW_STORAGE_KEY, ANALYSIS_STARTED_KEY, RESUME_CASE_KEY, BATCH_NOTICES_KEY].forEach((key) => window.localStorage.removeItem(key))
+    ;[REVIEW_STORAGE_KEY, LEGACY_REVIEW_STORAGE_KEY, ANALYSIS_STARTED_KEY, RESUME_CASE_KEY, BATCH_NOTICES_KEY, LEGACY_BATCH_NOTICES_KEY].forEach((key) => window.localStorage.removeItem(key))
     setQueueSeed(seed)
     setAnalysisStarted(false)
     setEvaluations({})
@@ -345,7 +376,6 @@ function App() {
     setAnalysisErrors({})
     setReviews({})
     setShownBatchNotices(new Set())
-    setBatchNotices([])
     setBulkAttested({})
     setEvaluationRun((value) => value + 1)
     navigate('/queue', true)
@@ -354,13 +384,19 @@ function App() {
   const selectedItem = route.caseId ? casesById.get(route.caseId) : undefined
   const selectedEvaluation = route.caseId ? evaluations[route.caseId] : undefined
   const selectedReview = route.caseId ? reviews[route.caseId] ?? emptyReview() : undefined
+  const selectedBatchUnit = route.unitId ? queue.find((unit) => unit.id === route.unitId && unit.kind === 'batch') : undefined
   const dashboardUnits = route.page === 'batch' && optionalBatch ? [optionalBatch] : queue
 
-  return <div className="app-shell">{route.page !== 'about' && <header className="site-header"><button className="wordmark" type="button" onClick={() => navigate('/about')}><span className="wordmark-mark">LE</span><span>LabelEvidence</span></button><nav className="site-nav"><button type="button" onClick={() => navigate('/about')}>About LabelEvidence</button><button type="button" onClick={() => { ensureQueue(); navigate('/queue') }}>Review queue</button><button type="button" onClick={() => { ensureQueue(); navigate('/batch/optional-batch-40') }}>Optional batch of 40</button><button type="button" onClick={resetData}>Reset all data</button></nav></header>}
-    {route.page === 'about' ? <Welcome onContinue={enterWorkspace} /> : <QueueDashboard units={dashboardUnits} casesById={casesById} evaluations={evaluations} processing={processing} errors={analysisErrors} reviews={reviews} analysisStarted={analysisStarted} onStartAnalysis={startAnalysis} onOpen={openReview} onStartHumanReview={startHumanReview} bulkAttested={bulkAttested} onBulkAttested={(id, value) => setBulkAttested((current) => ({ ...current, [id]: value }))} onBulkApprove={bulkApprove} title={route.page === 'batch' ? 'Optional batch demonstration' : undefined} description={route.page === 'batch' ? 'This category-balanced 40-label view does not change the saved main queue order.' : undefined} />}
-    {route.page === 'review' && selectedItem && selectedEvaluation && selectedReview && <CaseDetail item={selectedItem} evaluation={selectedEvaluation} review={selectedReview} onReviewChange={(review) => updateReview(selectedItem.id, review)} onClose={() => navigate('/queue')} onConfirmAndProceed={(review) => confirmAndProceed(selectedItem.id, review)} onRerun={() => rerunEvaluation(selectedItem.id)} />}
+  return <div className="app-shell">{route.page !== 'about' && <header className="site-header"><button className="wordmark" type="button" onClick={() => navigate('/about')}><span className="wordmark-mark">LE</span><span>LabelEvidence</span></button><nav className="site-nav"><button type="button" onClick={() => navigate('/about')}>About</button><button type="button" onClick={() => { ensureQueue(); navigate('/queue') }}>Active queue</button><button type="button" onClick={() => { ensureQueue(); navigate('/completed') }}>Completed reviews</button><button type="button" onClick={() => navigate('/prescreen')}>Applicant prescreen</button><button type="button" onClick={() => { ensureQueue(); navigate('/batch/optional-batch-40') }}>Optional batch of 40</button><button type="button" onClick={resetData}>Reset all data</button></nav></header>}
+    {route.page === 'about' && <Welcome onContinue={enterWorkspace} />}
+    {(route.page === 'queue' || route.page === 'batch' || route.page === 'review') && <QueueDashboard units={dashboardUnits} casesById={casesById} evaluations={evaluations} processing={processing} errors={analysisErrors} reviews={reviews} analysisStarted={analysisStarted} onStartAnalysis={startAnalysis} onOpen={(id) => openReview(id, '/queue')} onStartHumanReview={startHumanReview} bulkAttested={bulkAttested} onBulkAttested={(id, value) => setBulkAttested((current) => ({ ...current, [id]: value }))} onBulkApprove={bulkApprove} title={route.page === 'batch' ? 'Optional batch demonstration' : undefined} description={route.page === 'batch' ? 'This category-balanced 40-label view does not change the saved main queue order.' : undefined} />}
+    {route.page === 'completed' && <CompletedReviews order={queueOrder} casesById={casesById} evaluations={evaluations} reviews={reviews} onReviewAgain={(id) => openReview(id, '/completed')} />}
+    {route.page === 'prescreen' && <ApplicantPrescreen />}
+    {route.page === 'batch-review' && selectedBatchUnit && <BatchOverview unit={selectedBatchUnit} casesById={casesById} evaluations={evaluations} reviews={reviews} bulkAttested={Boolean(bulkAttested[selectedBatchUnit.id])} onBulkAttested={(value) => setBulkAttested((current) => ({ ...current, [selectedBatchUnit.id]: value }))} onBulkApprove={bulkApprove} onOpen={(id) => openReview(id, `/review-batch/${encodeURIComponent(selectedBatchUnit.id)}`)} onContinue={() => continueAfterBatch(selectedBatchUnit)} />}
+    {route.page === 'batch-review' && !selectedBatchUnit && <aside className="route-message"><strong>This batch could not be found in the current queue.</strong><button type="button" onClick={() => navigate('/queue')}>Return to queue</button></aside>}
+    {route.page === 'review' && selectedItem && selectedEvaluation && selectedReview && <CaseDetail item={selectedItem} evaluation={selectedEvaluation} review={selectedReview} onReviewChange={(review) => updateReview(selectedItem.id, review)} onClose={() => navigate(reviewReturnPath)} onConfirmAndProceed={(review) => confirmAndProceed(selectedItem.id, review)} onRerun={() => rerunEvaluation(selectedItem.id)} />}
     {route.page === 'review' && (!selectedItem || !selectedEvaluation) && <aside className="route-message"><strong>This label is not ready for human review yet.</strong><button type="button" onClick={() => navigate('/queue')}>Return to queue</button></aside>}
-    {batchNotices[0] && <BatchNotice unit={batchNotices[0]} onClose={() => setBatchNotices((current) => current.slice(1))} />}
+    {route.page === 'batch-review' && selectedBatchUnit && !shownBatchNotices.has(selectedBatchUnit.id) && <BatchNotice unit={selectedBatchUnit} onClose={() => acknowledgeBatch(selectedBatchUnit)} />}
   </div>
 }
 
