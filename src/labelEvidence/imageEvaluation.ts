@@ -1,4 +1,4 @@
-import { collapseWhitespace, similarity } from '../domain/normalization'
+import { bestObservedLine, collapseWhitespace, similarity } from '../domain/normalization'
 import { verifyLabel } from '../domain/verifyLabel'
 import type { OcrWord, ReviewCheck, ReviewOutcome } from '../domain/reviewSchema'
 import { recognizeLabel, type OcrProgress } from '../ocr/recognizeLabel'
@@ -96,9 +96,17 @@ function questionWasRead(question: EvidenceQuestion, text: string) {
   return question.expected.some((value) => observed.includes(normalized(value)) || similarity(value, text) >= .72)
 }
 
+function observedEvidence(expected: string, text: string) {
+  const collapsedText = collapseWhitespace(text)
+  const collapsedExpected = collapseWhitespace(expected)
+  const exactIndex = collapsedText.toLowerCase().indexOf(collapsedExpected.toLowerCase())
+  return exactIndex >= 0 ? collapsedText.slice(exactIndex, exactIndex + collapsedExpected.length) : bestObservedLine(expected, text)
+}
+
 function checkMatchesQuestion(check: ReviewCheck, question: EvidenceQuestion) {
   const checkKey = `${check.id} ${check.label}`.toLocaleLowerCase().replace(/[^a-z0-9]/g, '')
   const questionKey = `${question.id} ${question.label}`.toLocaleLowerCase().replace(/[^a-z0-9]/g, '')
+  if (question.id === 'responsibleParty' && /nameaddress/.test(checkKey)) return true
   const meaningful = question.id.toLocaleLowerCase().replace(/[^a-z0-9]/g, '')
   const checkId = check.id.toLocaleLowerCase().replace(/[^a-z0-9]/g, '')
   return (meaningful.length >= 4 && checkKey.includes(meaningful)) || (checkId.length >= 4 && questionKey.includes(checkId))
@@ -126,18 +134,38 @@ function deduplicateChecks(checks: ReviewCheck[]) {
   return [...unique.values()]
 }
 
+function concreteApplicationExpected(item: LabelEvidenceCase, check: ReviewCheck) {
+  const key = `${check.id} ${check.ruleId ?? ''} ${check.label}`.toLowerCase()
+  if (/brand-name|\bbrand name\b/.test(key) && !/brand-label|placement/.test(key)) return item.application.brandName
+  if (/class-type|class \/ type|class or type/.test(key)) return item.application.classType
+  if (/alcohol-content|alcohol content/.test(key)) return item.application.alcoholContent
+  if (/net-contents|net contents/.test(key)) return item.application.netContents
+  if (/name-address|name and address|responsible party/.test(key)) return item.application.responsibleParty
+  if (/country-of-origin|country of origin/.test(key) && item.application.countryOrigin) return `PRODUCT OF ${item.application.countryOrigin.toUpperCase()}`
+  if (/sulfite/.test(key) && item.application.sulfitesPpm >= 10) return 'CONTAINS SULFITES'
+  if (/formula/.test(key) && item.application.formula.required) return item.application.formula.labelingInstructions || item.application.classType
+  return check.expected
+}
+
+function concretizeCheck(item: LabelEvidenceCase, check: ReviewCheck): ReviewCheck {
+  return { ...check, expected: concreteApplicationExpected(item, check) }
+}
+
 function ensureQuestionChecks(outcome: ReviewOutcome, questions: EvidenceQuestion[]) {
   const checks = [...outcome.checks]
   for (const question of questions) {
     if (checks.some((check) => checkMatchesQuestion(check, question))) continue
     const found = questionWasRead(question, outcome.ocrText)
+    const bestExpected = found
+      ? question.expected.reduce((best, expected) => similarity(expected, observedEvidence(expected, outcome.ocrText)) > similarity(best, observedEvidence(best, outcome.ocrText)) ? expected : best, question.expected[0] ?? '')
+      : ''
     checks.push({
       id: `question-${question.id}`,
       ruleId: question.ruleId,
       label: question.label,
       status: found ? 'pass' : 'needs_review',
       expected: question.expected.join(' · '),
-      observed: found ? 'Expected evidence detected in OCR text' : 'Not confidently found',
+      observed: found ? observedEvidence(bestExpected, outcome.ocrText) || bestExpected : 'Not confidently found',
       explanation: found
         ? 'The required evidence was read from the submitted label image.'
         : `LabelEvidence could not verify this required item from the submitted image. OCR confidence was ${Math.round(outcome.ocrConfidence)}%. Confirm it directly on the label.`,
@@ -187,7 +215,7 @@ function checkToFlag(check: ReviewCheck): ReviewFlag {
 }
 
 function checkToResult(check: ReviewCheck): ReviewCheckResult {
-  return { id: check.id, label: check.label, status: check.status === 'pass' ? 'confirmed' : 'flagged', detail: check.explanation }
+  return { id: check.id, label: check.label, status: check.status === 'pass' ? 'confirmed' : 'flagged', detail: check.explanation, expected: check.expected, observed: check.observed }
 }
 
 export async function evaluateImageCase(item: LabelEvidenceCase, onProgress: (progress: OcrProgress) => void): Promise<ImageCaseEvaluation> {
@@ -217,7 +245,7 @@ export async function evaluateImageCase(item: LabelEvidenceCase, onProgress: (pr
   const checks = deduplicateChecks([
     ...(claimChecks.length ? questionChecks.filter((check) => check.id !== 'common.optional-information') : questionChecks),
     ...claimChecks,
-  ])
+  ]).map((check) => concretizeCheck(item, check))
   const rulesDurationMs = performance.now() - rulesStarted
   const outcome: ReviewOutcome = {
     ...initialOutcome,

@@ -9,15 +9,15 @@ The prototype does not receive a fixture's intended result or structured label-a
 - 56 independent cases
 - 42 cases designed without a planted issue and 14 with varied planted issues; OCR and the routed rules determine the runtime result
 - Eight high-level routing profiles
-- One-time reviewer introduction and prototype boundary
-- A first-in, first-out queue that begins with two individual labels and then a five-label batch
+- An About page with the reviewer model and prototype boundary
+- A saved, randomized first-in-first-out queue that begins with two individual labels and then a five-label batch
 - After the first batch, a deterministic 20% batch chance with batch sizes from three through seven
-- Background OCR/image evaluation in queue order
+- Reviewer-started OCR/image evaluation that continues in the background in queue order
 - Category-balanced simulated batches of 40
 - Exception-first human review
-- Per-concern confirmation or dismissal
-- Final approve or return-for-correction decisions
-- Previous/Next navigation through individual reviews
+- Per-concern confirmation or dismissal, plus disagreement controls for passed checks
+- Reversible draft approve or return-for-correction selections followed by explicit confirmation
+- Resume-and-proceed navigation through completed AI reviews
 - Decisions and reviewer notes preserved across browser refreshes
 - Local label-viewing controls for zoom, rotation, brightness, and contrast
 - Expandable complete review
@@ -34,7 +34,7 @@ The prototype does not receive a fixture's intended result or structured label-a
 7. Domestic malt beverages
 8. Imported malt beverages
 
-Each profile contains seven cases. The default workspace pre-evaluates all 56 individual labels. A simulated batch remains available as a secondary demonstration and selects five cases from every profile, producing 40 unique labels.
+Each profile contains seven cases. Every queue row remains **Not yet evaluated by AI** until the reviewer selects **Begin AI analysis**. A simulated batch remains available as a secondary demonstration and selects five cases from every profile, producing 40 unique labels.
 
 ## Review model
 
@@ -67,7 +67,7 @@ npm run lint
 npm run build
 ```
 
-The current suite verifies the 56-case distribution, absence of runtime expected-result fields, balanced 40-label selection, FIFO batch rules, separate human concerns, reviewer-attested batch approval, saved final decisions, and the underlying rule-engine behavior retained in the repository. Real OCR behavior is also checked in the running browser because it intentionally is not replaced by a structured fixture evaluator.
+The current suite verifies the 56-case distribution, absence of runtime expected-result fields, balanced 40-label selection, saved queue randomization, FIFO batch rules, manual analysis start, concrete expected-versus-observed evidence, separate human concerns, passed-check disagreements, reviewer-attested batch approval, explicit final-decision confirmation, and the underlying rule-engine behavior retained in the repository. Real OCR behavior is also checked in the running browser because it intentionally is not replaced by a structured fixture evaluator.
 
 ## Prototype boundary
 

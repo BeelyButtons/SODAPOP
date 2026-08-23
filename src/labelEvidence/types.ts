@@ -113,6 +113,8 @@ export interface ReviewCheckResult {
   label: string
   status: 'confirmed' | 'flagged'
   detail: string
+  expected: string
+  observed: string
 }
 
 export interface CaseEvaluation {

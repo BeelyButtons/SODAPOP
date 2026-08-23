@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createReviewQueue } from './reviewQueue'
+import { createRandomizedReviewQueue, createReviewQueue, randomizeCaseOrder } from './reviewQueue'
 
 const ids = Array.from({ length: 56 }, (_, index) => `LE-${String(index + 1).padStart(3, '0')}`)
 
@@ -19,5 +19,22 @@ describe('FIFO review queue', () => {
 
   it('is repeatable for a saved queue seed', () => {
     expect(createReviewQueue(ids, 99)).toEqual(createReviewQueue(ids, 99))
+  })
+
+  it('randomizes the label order once and preserves every label', () => {
+    const first = randomizeCaseOrder(ids, 12345)
+    expect(first).toEqual(randomizeCaseOrder(ids, 12345))
+    expect(first).not.toEqual(randomizeCaseOrder(ids, 54321))
+    expect([...first].sort()).toEqual([...ids].sort())
+  })
+
+  it('builds the same randomized FIFO units from the same saved seed', () => {
+    const queue = createRandomizedReviewQueue(ids, 20260823)
+    expect(queue).toEqual(createRandomizedReviewQueue(ids, 20260823))
+    expect(queue[0].kind).toBe('single')
+    expect(queue[1].kind).toBe('single')
+    expect(queue[2]).toMatchObject({ kind: 'batch' })
+    expect(queue[2].caseIds).toHaveLength(5)
+    expect(queue.flatMap((unit) => unit.caseIds).sort()).toEqual([...ids].sort())
   })
 })

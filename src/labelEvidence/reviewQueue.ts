@@ -10,6 +10,16 @@ function seededRandom(seed: number) {
   }
 }
 
+export function randomizeCaseOrder(caseIds: string[], seed: number) {
+  const random = seededRandom(seed)
+  const randomized = [...caseIds]
+  for (let index = randomized.length - 1; index > 0; index -= 1) {
+    const swap = Math.floor(random() * (index + 1))
+    ;[randomized[index], randomized[swap]] = [randomized[swap], randomized[index]]
+  }
+  return randomized
+}
+
 export function createReviewQueue(caseIds: string[], seed: number): ReviewQueueUnit[] {
   const units: ReviewQueueUnit[] = []
   const first = caseIds[0]
@@ -38,4 +48,8 @@ export function createReviewQueue(caseIds: string[], seed: number): ReviewQueueU
     }
   }
   return units
+}
+
+export function createRandomizedReviewQueue(caseIds: string[], seed: number) {
+  return createReviewQueue(randomizeCaseOrder(caseIds, seed), seed ^ 0x5f3759df)
 }
