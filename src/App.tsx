@@ -30,6 +30,13 @@ const ANALYSIS_STARTED_KEY = 'labelevidence.analysis-started.v1'
 const RESUME_CASE_KEY = 'labelevidence.resume-case.v1'
 const BATCH_NOTICES_KEY = 'labelevidence.human-batch-intros.v1'
 const LEGACY_BATCH_NOTICES_KEY = 'labelevidence.batch-notices.v1'
+const APP_BASE = import.meta.env.BASE_URL === '/' ? '' : import.meta.env.BASE_URL.replace(/\/$/, '')
+
+function appPath(pathname: string) {
+  if (!APP_BASE) return pathname
+  const stripped = pathname.startsWith(APP_BASE) ? pathname.slice(APP_BASE.length) : pathname
+  return stripped || '/'
+}
 
 function emptyReview(): StoredCaseReview {
   return { flagDecisions: {}, checkDisagreements: {}, note: '' }
@@ -226,7 +233,7 @@ function BatchOverview({ unit, casesById, evaluations, reviews, bulkAttested, on
 }
 
 function App() {
-  const [pathname, setPathname] = useState(window.location.pathname)
+  const [pathname, setPathname] = useState(() => appPath(window.location.pathname))
   const route = routeFromPath(pathname)
   const [queueSeed, setQueueSeed] = useState<number | null>(readQueueSeed)
   const [analysisStarted, setAnalysisStarted] = useState(() => window.localStorage.getItem(ANALYSIS_STARTED_KEY) === 'true')
@@ -245,8 +252,9 @@ function App() {
   const optionalBatch = useMemo<ReviewQueueUnit | null>(() => queueSeed === null ? null : ({ id: 'optional-batch-40', kind: 'batch', caseIds: selectBalancedCases(queueSeed ^ 0x13579bdf).map((item) => item.id) }), [queueSeed])
 
   function navigate(path: string, replace = false) {
-    if (replace) window.history.replaceState({}, '', path)
-    else window.history.pushState({}, '', path)
+    const browserPath = `${APP_BASE}${path}` || '/'
+    if (replace) window.history.replaceState({}, '', browserPath)
+    else window.history.pushState({}, '', browserPath)
     setPathname(path)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -260,7 +268,7 @@ function App() {
   }
 
   useEffect(() => {
-    const onPopState = () => setPathname(window.location.pathname)
+    const onPopState = () => setPathname(appPath(window.location.pathname))
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
   }, [])

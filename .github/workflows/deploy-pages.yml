@@ -1,9 +1,9 @@
-name: Deploy to GitHub Pages
+name: Deploy LabelEvidence to GitHub Pages
 
 on:
-  workflow_dispatch:
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -21,20 +21,25 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
-      - run: npm test
-      - run: npm run build
+      - name: Install dependencies
+        run: npm ci
+      - name: Build public application
+        run: npm run build
         env:
-          BASE_PATH: /${{ github.event.repository.name }}/
-      - name: Add SPA route fallback
+          BASE_PATH: /SODAPOP/
+      - name: Add single-page route fallback
         run: cp dist/index.html dist/404.html
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+      - name: Upload application
+        uses: actions/upload-pages-artifact@v3
         with:
           path: dist
       - name: Deploy
