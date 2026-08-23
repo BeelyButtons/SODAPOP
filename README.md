@@ -10,9 +10,15 @@ The prototype does not receive a fixture's intended result. Runtime evaluation r
 - 42 cases that evaluate with no red flags
 - 14 cases that evaluate with one or more concerns
 - Eight high-level routing profiles
+- One-time reviewer introduction and prototype boundary
+- Background pre-evaluation of the individual-label queue
 - Category-balanced simulated batches of 40
 - Exception-first human review
 - Per-concern confirmation or dismissal
+- Final approve or return-for-correction decisions
+- Previous/Next navigation through individual reviews
+- Decisions and reviewer notes preserved across browser refreshes
+- Local label-viewing controls for zoom, rotation, brightness, and contrast
 - Expandable complete review
 - Reviewer-attested bulk approval for labels with no detected red flags
 
@@ -27,7 +33,7 @@ The prototype does not receive a fixture's intended result. Runtime evaluation r
 7. Domestic malt beverages
 8. Imported malt beverages
 
-Each profile contains seven cases. A simulated batch selects five cases from every profile, producing 40 unique labels. Selection is random but reproducible from the saved batch seed.
+Each profile contains seven cases. The default workspace pre-evaluates all 56 individual labels. A simulated batch remains available as a secondary demonstration and selects five cases from every profile, producing 40 unique labels.
 
 ## Review model
 
@@ -41,7 +47,7 @@ LabelEvidence performs several separate tasks:
 6. Separates image uncertainty from compliance findings.
 7. Shows suspected concerns before successful checks.
 
-No-red-flag labels remain subject to reviewer approval. LabelEvidence is decision support, not an autonomous regulatory approval system.
+No-red-flag labels remain subject to reviewer approval. Concern resolutions, final decisions, timestamps, and reviewer notes are stored locally in the browser for the prototype and can be deliberately cleared with **Reset all data**. LabelEvidence is decision support, not an autonomous regulatory approval system.
 
 ## Local development
 
@@ -60,7 +66,7 @@ npm run lint
 npm run build
 ```
 
-The current suite verifies the 56-case distribution, absence of runtime expected-result fields, exact 75/25 clear-to-flagged evaluation mix, balanced batch selection, repeatable seeds, review controls, and the pre-existing rule-engine behavior retained in the repository.
+The current suite verifies the 56-case distribution, absence of runtime expected-result fields, exact 75/25 clear-to-flagged evaluation mix, balanced batch selection, repeatable seeds, queue preprocessing, saved final decisions, and the pre-existing rule-engine behavior retained in the repository.
 
 ## Prototype boundary
 
