@@ -542,11 +542,11 @@ export async function recognizeLabel(
         ))
       } catch (error) {
         if (!(error instanceof Error) || error.message !== BUDGET_TIMEOUT_MESSAGE) throw error
-        retryReason += ' The recovery pass reached the time budget, so SODAPOP returned the first-pass evidence.'
+        retryReason += ' The recovery pass reached the time budget, so LabelEvidence returned the first-pass evidence.'
         void discardWorker()
       }
     } else if (shouldRetryRecognition(firstPass.evidence, firstPass.confidence)) {
-      retryReason = 'The first pass used the recovery budget, so SODAPOP returned its best available evidence without another full scan.'
+      retryReason = 'The first pass used the recovery budget, so LabelEvidence returned its best available evidence without another full scan.'
     }
 
     const best = passes.reduce((winner, candidate) =>

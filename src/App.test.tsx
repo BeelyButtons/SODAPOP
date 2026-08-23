@@ -1,78 +1,31 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import App from './App'
 
-describe('App', () => {
-  beforeEach(() => {
-    window.localStorage.clear()
-    window.history.replaceState({}, '', '/review')
-  })
-
-  it('explains the local processing boundary', () => {
+describe('LabelEvidence app', () => {
+  it('explains the evidence-led, human-review purpose', () => {
     render(<App />)
-
-    expect(window.location.pathname).toBe('/review')
-    expect(screen.getByText(/Images are never uploaded/i)).toBeInTheDocument()
-    expect(screen.getByText(/Decision-support, not automatic approval/i)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /LabelEvidence home/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /Review the exceptions/i })).toBeInTheDocument()
+    expect(screen.getByText(/system receives no intended answer/i)).toBeInTheDocument()
   })
 
-  it('requires a label image before review', async () => {
+  it('shows 56 cases across all eight routing profiles', () => {
+    render(<App />)
+    expect(screen.getByRole('heading', { name: /56 cases across eight routing profiles/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Domestic wine — 7% ABV or higher' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Imported distilled spirits' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Imported malt beverages' })).toBeInTheDocument()
+  })
+
+  it('creates and evaluates a simulated balanced batch of 40', async () => {
     const user = userEvent.setup()
     render(<App />)
-
-    await user.click(screen.getByRole('link', { name: /New label/i }))
-
-    await user.click(screen.getByRole('button', { name: /Review label/i }))
-
-    expect(screen.getByText(/Upload a label image or choose a sample/i)).toBeInTheDocument()
-  })
-
-  it('opens on a queue containing every demonstration case', () => {
-    render(<App />)
-
-    expect(screen.getByRole('heading', { name: 'Labels to Review' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Start \/ Restart label reviews/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Compliant example/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Upside-down photo/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Imported spirits — complete/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Incorrect automatic rule set/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Production disclosures — complete/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Intrastate exemption and bottle evidence/i })).toBeInTheDocument()
-    expect(screen.getByLabelText(/47 labels remaining/i)).toBeInTheDocument()
-  })
-
-  it('renders a stable full rule-set reference route', () => {
-    window.history.replaceState({}, '', '/rules/distilled-spirits-domestic')
-    render(<App />)
-
-    expect(screen.getByRole('heading', { name: 'Distilled spirits — Domestic' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Base rules' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Conditional rules' })).toBeInTheDocument()
-  })
-
-  it('keeps completed reviews available in primary navigation', async () => {
-    const user = userEvent.setup()
-    render(<App />)
-
-    const completedLink = screen.getByRole('link', { name: /Completed reviews/i })
-    await user.click(completedLink)
-
-    expect(window.location.pathname).toBe('/review/completed')
-    expect(completedLink).toHaveClass('active')
-    expect(screen.getByRole('heading', { name: /Completed label review decisions/i })).toBeInTheDocument()
-  })
-
-  it('opens the document-aware preview without replacing the review queue', async () => {
-    const user = userEvent.setup()
-    render(<App />)
-
-    await user.click(screen.getByRole('button', { name: /Preview document-aware review/i }))
-
-    expect(window.location.pathname).toBe('/case-files')
-    expect(screen.getByRole('heading', { name: /Document-aware case review/i })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: /Review queue/i }))
-    expect(window.location.pathname).toBe('/review')
-    expect(screen.getByRole('heading', { name: 'Labels to Review' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /Create simulated batch of 40/i }))
+    expect(screen.getByRole('heading', { name: /Examining label/i })).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('heading', { name: /Batch review complete/i })).toBeInTheDocument(), { timeout: 3000 })
+    expect(screen.getByText('Labels evaluated').previousElementSibling).toHaveTextContent('40')
+    expect(screen.getByRole('table', { name: /Labels needing human review/i })).toBeInTheDocument()
   })
 })

@@ -1,4 +1,4 @@
-# SODAPOP post-rule-expansion specification
+# LabelEvidence post-rule-expansion specification
 
 Status: **Approved; routing foundation plus distilled-spirits, wine, and malt-beverage card expansions implemented.**
 
@@ -6,7 +6,7 @@ This specification converts the approved TTB rule-family catalog into machine-re
 
 ## Scope and authority
 
-SODAPOP remains TTB reviewer-side decision support for COLA review. It does not create a new industry submission process and does not implement FDA or CBP compliance systems.
+LabelEvidence remains TTB reviewer-side decision support for COLA review. It does not create a new industry submission process and does not implement FDA or CBP compliance systems.
 
 The specification uses:
 
@@ -56,7 +56,7 @@ The rule-set label describes the regulatory branch, not merely a beverage name. 
 
 ## Recommendation behavior
 
-For every applicable rule, SODAPOP must attempt a best-supported recommendation:
+For every applicable rule, LabelEvidence must attempt a best-supported recommendation:
 
 - **Pass recommendation:** available evidence supports the requirement.
 - **Fail recommendation:** available evidence shows a missing, conflicting, or noncompliant element.
@@ -89,13 +89,13 @@ Hover may show a short description for pointer users, but no required informatio
 
 `Open full rule set` opens a dedicated, read-only browser window or tab at a stable route such as:
 
-`/SODAPOP/rules/:rule-set-id`
+`/LabelEvidence/rules/:rule-set-id`
 
 That reference view lists each rule's requirement, applicability, evidence sources, and authority. It remains open independently so a reviewer can compare it with the active review.
 
 ### Manual override
 
-The reviewer may choose another rule set. Before reanalysis, SODAPOP must show:
+The reviewer may choose another rule set. Before reanalysis, LabelEvidence must show:
 
 - the current automatically selected set;
 - the requested replacement;

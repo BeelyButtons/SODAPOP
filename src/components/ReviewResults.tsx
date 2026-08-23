@@ -720,7 +720,7 @@ export function ReviewResults({
               {!readOnly && remainingPassedSectionChecks.length > 0 && (
                 <section className="accept-passed-sections" aria-label="Accept passed sections">
                   <div>
-                    <strong>{reviewSections.filter((section) => section.status === 'pass').length} sections passed SODAPOP’s checks</strong>
+                    <strong>{reviewSections.filter((section) => section.status === 'pass').length} sections passed LabelEvidence’s checks</strong>
                     <span>Accept these together, then concentrate on the sections that still need your judgment.</span>
                   </div>
                   <button type="button" onClick={() => passSection(remainingPassedSectionChecks.map((check) => check.id))}>Accept passed sections</button>

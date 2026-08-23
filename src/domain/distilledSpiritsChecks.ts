@@ -79,7 +79,7 @@ function missingContextCard(rule: RuleApplicability) {
     rule,
     'needs_review',
     `Missing context: ${missing}`,
-    `${rule.rule.missingContext} SODAPOP did not treat missing information as “does not apply.”`,
+    `${rule.rule.missingContext} LabelEvidence did not treat missing information as “does not apply.”`,
   )
 }
 
@@ -176,7 +176,7 @@ function sameFieldCard(rule: RuleApplicability, coreChecks: Input['coreChecks'])
       rule,
       'mismatch',
       `Problem with: ${mismatches.map((check) => check.label).join(', ')}.`,
-      `SODAPOP could not establish the shared field of vision because ${mismatches.map((check) => `${check.label.toLowerCase()} is missing or conflicts with the application`).join('; ')}. Detected evidence remains highlighted for inspection.`,
+      `LabelEvidence could not establish the shared field of vision because ${mismatches.map((check) => `${check.label.toLowerCase()} is missing or conflicts with the application`).join('; ')}. Detected evidence remains highlighted for inspection.`,
       undefined,
       evidence,
       ),
@@ -207,7 +207,7 @@ function countryOriginCard(rule: RuleApplicability, application: ApplicationData
       rule,
       'needs_review',
       'Country-of-origin statement was not readable in OCR.',
-      'Inspect the origin area. SODAPOP cannot distinguish an absent statement from text hidden by glare, blur, or obstruction.',
+      'Inspect the origin area. LabelEvidence cannot distinguish an absent statement from text hidden by glare, blur, or obstruction.',
       [`PRODUCT OF ${expected}`],
     )
   }

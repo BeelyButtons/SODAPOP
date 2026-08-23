@@ -27,9 +27,9 @@ export type ReviewRecordInput = Pick<
   'finalDecision' | 'staffDecisions' | 'result' | 'rotationDegrees' | 'completedAt'
 >
 
-const storageKey = 'sodapop-review-queue-v3'
-const previousStorageKey = 'sodapop-review-queue-v2'
-const legacyStorageKey = 'sodapop-review-queue-v1'
+const storageKey = 'labelevidence-review-queue-v3'
+const previousStorageKey = 'labelevidence-review-queue-v2'
+const legacyStorageKey = 'labelevidence-review-queue-v1'
 
 export function emptyQueueProgress(): QueueProgress {
   return { records: {}, currentBySample: {} }

@@ -1,10 +1,10 @@
-# SODAPOP reviewer case-file specification
+# LabelEvidence reviewer case-file specification
 
 Status: **Foundation and twelve-case guarded pilot implemented; full-queue integration deferred.**
 
 ## Purpose
 
-SODAPOP must review a COLA case, not treat a label image as the entire case. The label is one evidence source within a packet that also contains applicant authorization, an authoritative product determination, supporting documents, container information, and review history.
+LabelEvidence must review a COLA case, not treat a label image as the entire case. The label is one evidence source within a packet that also contains applicant authorization, an authoritative product determination, supporting documents, container information, and review history.
 
 This specification applies across distilled spirits, wine, and malt beverages. Commodity-specific rules remain separate, but all three use the same evidence model and decision language.
 

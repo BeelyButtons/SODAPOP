@@ -253,7 +253,7 @@ export function selectAutomaticRuleSet(context: ReviewContext, selectedAt = new 
     return {
       status: 'missing_context',
       mode: 'automatic',
-      reasons: ['SODAPOP needs more application context before selecting a rule set.'],
+      reasons: ['LabelEvidence needs more application context before selecting a rule set.'],
       conflicts: [],
       missingFacts: automatic.missingFacts,
       audit: [],

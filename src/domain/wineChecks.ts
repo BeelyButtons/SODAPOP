@@ -60,7 +60,7 @@ function missingContextCard(rule: RuleApplicability, detail?: string) {
     rule,
     'needs_review',
     `Missing context: ${missing}`,
-    `${rule.rule.missingContext} SODAPOP did not treat missing information as “does not apply.”`,
+    `${rule.rule.missingContext} LabelEvidence did not treat missing information as “does not apply.”`,
   )
 }
 
@@ -327,7 +327,7 @@ function evaluatedRuleCard(rule: RuleApplicability, input: Input): ReviewCheck {
     case 'common.formula-labeling-instructions': return textEvidenceCard(rule, ocrText, ocrConfidence, application.formulaLabelingInstructions?.split('|') ?? [], 'Every formula-directed labeling statement was located.')
     case 'common.exemption-eligibility': return application.source === 'imported' ? card(rule, 'mismatch', 'Imported product', 'A certificate of exemption is unavailable for wine imported in bottles.') : card(rule, 'pass', 'Domestic wine', 'The source branch may proceed to State-limitation review.')
     case 'common.exemption-state-limitation': return textEvidenceCard(rule, ocrText, ocrConfidence, application.destinationState ? [`FOR SALE IN ${application.destinationState} ONLY`] : [], 'The State limitation matches the application.')
-    case 'wine.under-seven-routing': return card(rule, 'pass', `${application.alcoholContent} · No Part 4 COLA review`, 'SODAPOP routed the product to applicable TTB Parts 16 and 24 without implementing FDA rules.', undefined, { applicabilityExplanation: 'The application ABV is below 7%.', applicationEvidence: application.alcoholContent, labelEvidence: 'Part 4 review stopped; applicable TTB labeling cards remain below.' })
+    case 'wine.under-seven-routing': return card(rule, 'pass', `${application.alcoholContent} · No Part 4 COLA review`, 'LabelEvidence routed the product to applicable TTB Parts 16 and 24 without implementing FDA rules.', undefined, { applicabilityExplanation: 'The application ABV is below 7%.', applicationEvidence: application.alcoholContent, labelEvidence: 'Part 4 review stopped; applicable TTB labeling cards remain below.' })
     case 'wine.under-seven-name-address': return nameAddressCard(rule, application, ocrText, ocrConfidence)
     case 'wine.under-seven-alcohol-content': return wineAlcoholCard(rule, application, ocrText, true)
     case 'wine.brand-label-placement': return brandLabelPlacementCard(rule, application, coreChecks, ocrText)

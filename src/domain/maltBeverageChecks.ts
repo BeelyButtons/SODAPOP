@@ -55,7 +55,7 @@ function card(
 
 function missingContextCard(rule: RuleApplicability, detail?: string) {
   const missing = detail || (rule.missingFacts.length ? rule.missingFacts.join(', ') : 'required review evidence')
-  return card(rule, 'needs_review', `Missing context: ${missing}`, `${rule.rule.missingContext} SODAPOP did not treat missing information as “does not apply.”`)
+  return card(rule, 'needs_review', `Missing context: ${missing}`, `${rule.rule.missingContext} LabelEvidence did not treat missing information as “does not apply.”`)
 }
 
 function textEvidenceCard(rule: RuleApplicability, text: string, confidence: number, phrases: string[], explanation: string) {
@@ -170,7 +170,7 @@ function alcoholContentCard(rule: RuleApplicability, application: ApplicationDat
   const prohibitedRange = text.match(/\b(?:at least|not more than|maximum|minimum)\b[^\n%]{0,30}\d+(?:\.\d+)?\s*%|\d+(?:\.\d+)?\s*%\s*(?:to|-)\s*\d+(?:\.\d+)?\s*%/i)?.[0]
   if (prohibitedRange) return card(rule, 'mismatch', prohibitedRange, 'Malt-beverage alcohol content may not be expressed as a range, maximum, or minimum value.')
   const observed = findAlcohol(text)
-  if (!observed) return card(rule, 'needs_review', 'Alcohol statement not found', application.maltAlcoholFromAddedIngredients ? 'Alcohol by volume is mandatory because covered added ingredients contribute alcohol, but SODAPOP did not locate it reliably.' : 'The application or artwork indicates an alcohol statement, but SODAPOP did not locate it reliably.')
+  if (!observed) return card(rule, 'needs_review', 'Alcohol statement not found', application.maltAlcoholFromAddedIngredients ? 'Alcohol by volume is mandatory because covered added ingredients contribute alcohol, but LabelEvidence did not locate it reliably.' : 'The application or artwork indicates an alcohol statement, but LabelEvidence did not locate it reliably.')
   if (/\bABV\b/i.test(observed)) return card(rule, 'mismatch', observed, '“ABV” is not an authorized abbreviation in a malt-beverage alcohol-content statement.')
   const labeled = parseAlcohol(observed).abv
   if (labeled === null) return card(rule, 'needs_review', observed, 'OCR did not yield a reliable numerical alcohol value.')

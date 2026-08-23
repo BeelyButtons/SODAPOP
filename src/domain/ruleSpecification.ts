@@ -514,7 +514,7 @@ export const RULE_SPECIFICATIONS = [
     id: 'wine.under-seven-routing',
     category: 'wine',
     title: 'Wine below 7% TTB jurisdiction routing',
-    requirement: 'Wine below 7% alcohol by volume is outside TTB FAA Act COLA jurisdiction; SODAPOP must route it without implementing FDA rules.',
+    requirement: 'Wine below 7% alcohol by volume is outside TTB FAA Act COLA jurisdiction; LabelEvidence must route it without implementing FDA rules.',
     authorities: ['https://www.ttb.gov/regulated-commodities/beverage-alcohol/wine/7percentorless'],
     appliesWhen: { description: 'Wine contains less than 7% alcohol by volume.', all: [{ fact: 'alcoholContent', operator: 'gt', value: 0 }, { fact: 'alcoholContent', operator: 'lte', value: 6.999 }] },
     requiredFacts: ['alcoholContent', 'source'],

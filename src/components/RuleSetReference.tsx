@@ -15,7 +15,7 @@ export function RuleSetReference({ ruleSetId }: { ruleSetId: string }) {
   return (
     <section className="rule-reference-page" aria-labelledby="rule-reference-title">
       <header>
-        <p className="eyebrow">SODAPOP rule reference</p>
+        <p className="eyebrow">LabelEvidence rule reference</p>
         <h1 id="rule-reference-title">{ruleSet.label}</h1>
         <p>{ruleSet.description}</p>
         <dl>

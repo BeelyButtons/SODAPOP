@@ -50,7 +50,7 @@ describe('review queue', () => {
   })
 
   it('migrates version-two decisions to review IDs without losing saved work', () => {
-    window.localStorage.setItem('sodapop-review-queue-v2', JSON.stringify({
+    window.localStorage.setItem('labelevidence-review-queue-v2', JSON.stringify({
       valid: { finalDecision: 'pass', staffDecisions: { brand: 'pass' }, rotationDegrees: 90, completedAt: '2026-08-18T00:00:00.000Z' },
     }))
 
