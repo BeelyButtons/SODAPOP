@@ -2,16 +2,17 @@
 
 LabelEvidence is an evidence-led alcohol label review prototype. It compares submitted label information with application facts, linked evidence, and routed disclosure requirements, then sends suspected concerns to a human reviewer.
 
-The prototype does not receive a fixture's intended result. Runtime evaluation receives only the application record, evidence records, label information, and image-quality facts.
+The prototype does not receive a fixture's intended result or structured label-answer sheet. Runtime evaluation receives an application/evidence packet and an actual raster label image.
 
 ## Current demonstration
 
 - 56 independent cases
-- 42 cases that evaluate with no red flags
-- 14 cases that evaluate with one or more concerns
+- 42 cases designed without a planted issue and 14 with varied planted issues; OCR and the routed rules determine the runtime result
 - Eight high-level routing profiles
 - One-time reviewer introduction and prototype boundary
-- Background pre-evaluation of the individual-label queue
+- A first-in, first-out queue that begins with two individual labels and then a five-label batch
+- After the first batch, a deterministic 20% batch chance with batch sizes from three through seven
+- Background OCR/image evaluation in queue order
 - Category-balanced simulated batches of 40
 - Exception-first human review
 - Per-concern confirmation or dismissal
@@ -39,13 +40,13 @@ Each profile contains seven cases. The default workspace pre-evaluates all 56 in
 
 LabelEvidence performs several separate tasks:
 
-1. Routes the product using application facts.
-2. Checks whether required evidence is available.
-3. Compares application fields with label information.
-4. Checks conditional disclosures and warning presentation.
-5. Identifies optional claims requiring human judgment.
-6. Separates image uncertainty from compliance findings.
-7. Shows suspected concerns before successful checks.
+1. Routes the product using application and supporting-evidence facts.
+2. Turns every applicable rule into a required evidence question.
+3. Gives those questions to local OCR and image analysis so reading is requirement-directed.
+4. Compares the resulting image evidence with each requirement and application value.
+5. Creates one separate concern for every unresolved or conflicting requirement.
+6. Inventories and evaluates optional claims separately.
+7. Separates image uncertainty from readable conflicts and shows only suspected concerns to the reviewer.
 
 No-red-flag labels remain subject to reviewer approval. Concern resolutions, final decisions, timestamps, and reviewer notes are stored locally in the browser for the prototype and can be deliberately cleared with **Reset all data**. LabelEvidence is decision support, not an autonomous regulatory approval system.
 
@@ -66,7 +67,7 @@ npm run lint
 npm run build
 ```
 
-The current suite verifies the 56-case distribution, absence of runtime expected-result fields, exact 75/25 clear-to-flagged evaluation mix, balanced batch selection, repeatable seeds, queue preprocessing, saved final decisions, and the pre-existing rule-engine behavior retained in the repository.
+The current suite verifies the 56-case distribution, absence of runtime expected-result fields, balanced 40-label selection, FIFO batch rules, separate human concerns, reviewer-attested batch approval, saved final decisions, and the underlying rule-engine behavior retained in the repository. Real OCR behavior is also checked in the running browser because it intentionally is not replaced by a structured fixture evaluator.
 
 ## Prototype boundary
 

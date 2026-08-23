@@ -40,6 +40,14 @@ type VerificationInput = {
   ocrPassTimingsMs?: number[]
   ocrRetryReason?: string
   ruleSelection?: RuleSetSelection
+  warningPresentation?: {
+    headingBold: boolean
+    bodyNotBold: boolean
+    minimumTypeSizeMet: boolean
+    densityMet: boolean
+    contrastMet: boolean
+    separated: boolean
+  }
 }
 
 function normalizedToken(value: string) {
@@ -290,6 +298,7 @@ function warningChecks(
   containerVolumeMl: number,
   highlight?: HighlightRegion,
   improperBoldBody?: ReturnType<typeof findImproperlyBoldWarningBody>,
+  presentation?: VerificationInput['warningPresentation'],
 ): ReviewCheck[] {
   const collapsed = collapseWhitespace(text)
   const exactMatch = collapsed.includes(GOVERNMENT_WARNING)
@@ -320,8 +329,11 @@ function warningChecks(
   }
 
   const uppercaseHeading = collapsed.includes('GOVERNMENT WARNING:')
-  const formatStatus: CheckStatus = uppercaseHeading && !improperBoldBody
-    ? 'needs_review'
+  const presentationPassed = Boolean(presentation && Object.values(presentation).every(Boolean))
+  const formatStatus: CheckStatus = uppercaseHeading && !improperBoldBody && presentationPassed
+    ? 'pass'
+    : uppercaseHeading && !improperBoldBody
+      ? 'needs_review'
     : improperBoldBody || textStatus === 'mismatch'
       ? 'mismatch'
       : 'needs_review'
@@ -353,11 +365,15 @@ function warningChecks(
       ],
       observed: improperBoldBody
         ? 'Body text immediately following the heading appears bold.'
+        : presentationPassed
+          ? 'Image analysis confirmed heading weight, body weight, minimum type size, density, contrast, and separation.'
         : uppercaseHeading
           ? 'Uppercase heading detected; remaining physical formatting requires visual confirmation.'
         : 'Required uppercase heading was not detected.',
       explanation: improperBoldBody
         ? 'Only “GOVERNMENT WARNING” may be bold. The detected bold body text does not comply.'
+        : presentationPassed
+          ? 'The warning presentation meets every automated image measurement available for this submitted label face.'
         : uppercaseHeading
           ? 'No clear body-bolding problem was detected. Confirm heading weight, type size, contrast, and separation visually.'
         : textStatus === 'needs_review'
@@ -422,6 +438,7 @@ export function verifyLabel(input: VerificationInput): ReviewOutcome {
       input.application.containerVolumeMl,
       warningHighlight,
       improperBoldBody,
+      input.warningPresentation,
     )
   const coreChecks = {
     ...highlightedCoreChecks,

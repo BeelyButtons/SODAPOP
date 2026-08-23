@@ -10,6 +10,7 @@ import {
   similarity,
 } from '../domain/normalization'
 import { GOVERNMENT_WARNING, type ApplicationData, type OcrBox, type OcrWord } from '../domain/reviewSchema'
+import type { EvidenceQuestion } from '../labelEvidence/evidenceQuestions'
 
 export type OcrProgress = {
   progress: number
@@ -323,7 +324,18 @@ function alcoholEvidenceDetected(text: string, application: ApplicationData) {
   return false
 }
 
-function recognitionExpectations(text: string, application: ApplicationData): EvidenceExpectation[] {
+function recognitionExpectations(text: string, application: ApplicationData, questions?: EvidenceQuestion[]): EvidenceExpectation[] {
+  if (questions?.length) {
+    return questions
+      .filter((question) => question.expected.length)
+      .map((question) => ({
+        id: question.id,
+        weight: question.weight,
+        matched: question.exactText
+          ? question.expected.every((expected) => collapseWhitespace(text).includes(collapseWhitespace(expected)))
+          : question.expected.some((expected) => phraseDetected(expected, text, .7)),
+      }))
+  }
   const expectations: EvidenceExpectation[] = [
     { id: 'brand', weight: 1, matched: phraseDetected(application.brandName, text) },
     { id: 'class-type', weight: 1, matched: phraseDetected(application.classType, text) },
@@ -377,8 +389,8 @@ function recognitionExpectations(text: string, application: ApplicationData): Ev
   return expectations
 }
 
-export function recognitionEvidence(text: string, application: ApplicationData): RecognitionEvidence {
-  const expectations = recognitionExpectations(text, application)
+export function recognitionEvidence(text: string, application: ApplicationData, questions?: EvidenceQuestion[]): RecognitionEvidence {
+  const expectations = recognitionExpectations(text, application, questions)
   const totalWeight = expectations.reduce((total, expectation) => total + expectation.weight, 0)
   const matchedWeight = expectations.reduce((total, expectation) => total + (expectation.matched ? expectation.weight : 0), 0)
   return {
@@ -464,6 +476,7 @@ async function runPass(
   worker: Awaited<ReturnType<typeof getWorker>>,
   canvas: HTMLCanvasElement,
   application: ApplicationData,
+  questions: EvidenceQuestion[] | undefined,
   options: { rotateAuto?: boolean; rotateRadians?: number; pageSegMode?: PSM },
 ): Promise<RecognitionPass> {
   const passStartedAt = performance.now()
@@ -483,7 +496,7 @@ async function runPass(
     confidence: result.data.confidence,
     blocks: result.data.blocks,
     rotationRadians: result.data.rotateRadians ?? recognizeOptions.rotateRadians ?? 0,
-    evidence: recognitionEvidence(result.data.text, application),
+    evidence: recognitionEvidence(result.data.text, application, questions),
     canvas,
     rotatedWidth: rotated.width,
     rotatedHeight: rotated.height,
@@ -500,6 +513,7 @@ export async function recognizeLabel(
   file: File,
   application: ApplicationData,
   onProgress: (progress: OcrProgress) => void,
+  questions?: EvidenceQuestion[],
 ) {
   const startedAt = performance.now()
   progressListener = onProgress
@@ -515,7 +529,7 @@ export async function recognizeLabel(
     const passes: RecognitionPass[] = []
     let attemptsStarted = 1
     let retryReason: string | undefined
-    passes.push(await runPass(worker, prepared.standard, application, { rotateAuto: true }))
+    passes.push(await runPass(worker, prepared.standard, application, questions, { rotateAuto: true }))
 
     const firstPass = passes[0]
     const elapsedAfterFirstPass = performance.now() - startedAt
@@ -536,7 +550,7 @@ export async function recognizeLabel(
           ? { rotateRadians: Math.PI, pageSegMode: PSM.SPARSE_TEXT }
           : { rotateAuto: true, pageSegMode: PSM.AUTO }
         passes.push(await withTimeout(
-          runPass(worker, recoveryCanvas, application, recoveryOptions),
+          runPass(worker, recoveryCanvas, application, questions, recoveryOptions),
           remainingBudget,
           BUDGET_TIMEOUT_MESSAGE,
         ))

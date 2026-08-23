@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { LABEL_EVIDENCE_CASES, ROUTING_CATEGORIES } from './cases'
 import { selectBalancedCases } from './batch'
-import { evaluateCase } from './evaluate'
 
 describe('LabelEvidence demonstration cases', () => {
   it('contains seven cases in each of eight routing categories', () => {
@@ -21,11 +20,6 @@ describe('LabelEvidence demonstration cases', () => {
     }
   })
 
-  it('produces the designed 75/25 clear-to-flagged mix by evaluating case facts', () => {
-    const evaluations = LABEL_EVIDENCE_CASES.map(evaluateCase)
-    expect(evaluations.filter((item) => item.flags.length === 0)).toHaveLength(42)
-    expect(evaluations.filter((item) => item.flags.length > 0)).toHaveLength(14)
-  })
 })
 
 describe('balanced batch selection', () => {

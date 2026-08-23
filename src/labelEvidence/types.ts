@@ -122,11 +122,3 @@ export interface CaseEvaluation {
   checks: ReviewCheckResult[]
   reviewedAt: string
 }
-
-export interface SimulatedBatch {
-  id: string
-  seed: number
-  createdAt: string
-  caseIds: string[]
-  evaluations: CaseEvaluation[]
-}

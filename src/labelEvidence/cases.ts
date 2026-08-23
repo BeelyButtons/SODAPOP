@@ -19,7 +19,11 @@ export const ROUTING_CATEGORIES: RoutingCategory[] = [
 ]
 
 const BRAND_STEMS = ['Cedar Harbor', 'Northline', 'Golden Field', 'River Lantern', 'Stone Orchard', 'Blue Meridian', 'Juniper House']
-const US_PARTIES = ['Bottled by Harbor Creek Beverage Co., Louisville, KY', 'Produced by Northline Cellars, Napa, CA', 'Brewed by Golden Field Brewing, Denver, CO']
+const US_PARTIES = {
+  wine: 'Bottled by Northline Cellars, Napa, CA',
+  distilled_spirits: 'Produced and Bottled by Harbor Creek Distilling, Louisville, KY',
+  malt_beverage: 'Brewed and Bottled by Golden Field Brewing, Denver, CO',
+} as const
 const IMPORT_PARTIES = ['Imported by Meridian Imports, Baltimore, MD', 'Imported by Harbor Trade Co., Newark, NJ', 'Imported by Northstar Beverage, Miami, FL']
 
 function productValues(category: RoutingCategory, variant: number) {
@@ -60,9 +64,9 @@ function baseCase(category: RoutingCategory, categoryIndex: number, variant: num
   const number = categoryIndex * 7 + variant + 1
   const caseId = `LE-${String(number).padStart(3, '0')}`
   const product = productValues(category, variant)
-  const brandName = `${BRAND_STEMS[variant]} ${category.commodity === 'wine' ? 'Cellars' : category.commodity === 'distilled_spirits' ? 'Reserve' : 'Brewing'}`
+  const brandName = `${BRAND_STEMS[variant]} ${category.commodity === 'wine' ? 'Cellars' : category.commodity === 'distilled_spirits' ? 'Distilling' : 'Brewing'}`
   const countryOrigin = category.source === 'imported' ? ['France', 'Italy', 'Mexico', 'Canada'][variant % 4] : undefined
-  const responsibleParty = category.source === 'imported' ? IMPORT_PARTIES[variant % IMPORT_PARTIES.length] : US_PARTIES[categoryIndex % US_PARTIES.length]
+  const responsibleParty = category.source === 'imported' ? IMPORT_PARTIES[variant % IMPORT_PARTIES.length] : US_PARTIES[category.commodity]
   const formulaId = `F-${categoryIndex + 1}${variant + 1}-2026`
   const application: ApplicationRecord = {
     id: `APP-${caseId}`,
