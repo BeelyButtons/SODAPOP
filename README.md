@@ -36,18 +36,34 @@ LabelEvidence is an evidence-led alcohol label review prototype. It compares pro
 
 Each profile contains seven cases.
 
-## Approach
+## Development and review approach
 
-LabelEvidence uses the application to determine what the label must prove. Its review process is:
+LabelEvidence was developed around an application-guided, human-in-the-loop review model. Instead of attempting to read a label first and decide what matters afterward, the application information determines which requirements apply. Those requirements become specific evidence questions that direct the OCR and image analysis.
 
-1. Read the application and supporting product information.
-2. Select applicable requirements using factors such as beverage type, domestic or imported status, alcohol content, ingredients, formula information, and other product characteristics.
-3. Convert each applicable requirement into a specific evidence question.
-4. Use OCR and image analysis to examine the actual label image.
-5. Compare information found in the image with the application and required disclosures.
-6. Inventory and evaluate optional statements and claims separately.
-7. Create one human-review concern for each missing, uncertain, or conflicting requirement.
-8. Allow the reviewer to confirm or dismiss concerns and make the final approve-or-return decision.
+The prototype was built using the following approach:
+
+- Model product-application information separately from label-image evidence.
+- Route each application to requirements based on beverage type, domestic or imported status, alcohol content, ingredients, formula information, and other relevant characteristics.
+- Convert applicable requirements into specific questions that the image analysis must answer.
+- Use local browser-based OCR to examine the actual label image.
+- Compare the resulting image evidence with application values and required disclosures.
+- Evaluate optional label statements and claims separately.
+- Treat unreadable image evidence differently from a readable compliance conflict.
+- Show human reviewers only unresolved, missing, or conflicting matters requiring attention.
+- Keep final approval and return-for-correction decisions under human control.
+- Test the workflow using synthetic applications and label images covering multiple beverage and submission categories.
+- Use automated tests and live-browser checks to verify routing, comparisons, reviewer decisions, batch handling, uploads, and public deployment.
+
+For each application, LabelEvidence then:
+
+1. Reads the application and supporting product information.
+2. Selects the applicable requirements.
+3. Converts each requirement into an evidence question.
+4. Uses OCR and image analysis to examine the submitted label.
+5. Compares the image evidence with the application and required disclosures.
+6. Inventories and evaluates optional statements and claims.
+7. Creates one human-review concern for each missing, uncertain, or conflicting requirement.
+8. Allows the reviewer to resolve those concerns and make the final decision.
 
 The interface emphasizes exceptions. When a label requires human attention, the reviewer sees what could not be verified or what appears inconsistent rather than a large collection of cards describing everything that passed.
 
@@ -218,7 +234,7 @@ OCR runs locally in the browser. The demonstration does not require a cloud mach
 
 ## Local setup and run instructions
 
-Requirements: a current Node.js installation with npm.
+Requirements: Node.js 22 and npm.
 
 ```bash
 git clone https://github.com/BeelyButtons/LabelEvidence.git
